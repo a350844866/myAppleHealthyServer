@@ -714,22 +714,24 @@ def ingest_samples(payload: IngestPayload, authorization: str | None = Header(No
             business_deduped_count = 0
             if rows:
                 # Business dedup: filter out records already present by content identity
-                # (type, start_at, end_at, source_name). This handles the case where the
-                # same HealthKit sample was previously imported via XML export and now arrives
-                # via Bridge — both paths produce different record_hash values, so INSERT IGNORE
-                # alone would create duplicates. We pre-filter those rows here.
+                # (type, start_at, end_at, source_name). Process in chunks to avoid
+                # query size limits and slow IN() scans on large tables.
+                DEDUP_CHUNK = 50
+                existing_keys: set = set()
                 check_keys = [(row[1], row[9], row[10], row[2]) for row in rows]
-                placeholders = ", ".join(["(%s, %s, %s, %s)"] * len(check_keys))
-                flat_params = [v for key in check_keys for v in key]
-                cur.execute(
-                    f"SELECT type, start_at, end_at, source_name FROM health_records "
-                    f"WHERE (type, start_at, end_at, source_name) IN ({placeholders})",
-                    flat_params,
-                )
-                existing_keys = {
-                    (r["type"], r["start_at"], r["end_at"], r["source_name"])
-                    for r in cur.fetchall()
-                }
+                for i in range(0, len(check_keys), DEDUP_CHUNK):
+                    chunk = check_keys[i : i + DEDUP_CHUNK]
+                    placeholders = ", ".join(["(%s, %s, %s, %s)"] * len(chunk))
+                    flat_params = [v for key in chunk for v in key]
+                    cur.execute(
+                        f"SELECT type, start_at, end_at, source_name FROM health_records "
+                        f"WHERE (type, start_at, end_at, source_name) IN ({placeholders})",
+                        flat_params,
+                    )
+                    existing_keys.update(
+                        (r["type"], r["start_at"], r["end_at"], r["source_name"])
+                        for r in cur.fetchall()
+                    )
                 filtered_rows = [
                     row for row in rows
                     if (row[1], row[9], row[10], row[2]) not in existing_keys
