@@ -1508,6 +1508,74 @@ def get_overview():
     }
 
 
+@app.get("/api/stats/today")
+def get_today_stats():
+    with get_db() as db, db.cursor() as cur:
+        # Today's steps
+        cur.execute(
+            "SELECT COALESCE(SUM(value_num), 0) AS v FROM health_records WHERE type=%s AND local_date=CURDATE()",
+            ("HKQuantityTypeIdentifierStepCount",),
+        )
+        steps = int(cur.fetchone()["v"])
+
+        # Today's active energy
+        cur.execute(
+            "SELECT COALESCE(SUM(value_num), 0) AS v FROM health_records WHERE type=%s AND local_date=CURDATE()",
+            ("HKQuantityTypeIdentifierActiveEnergyBurned",),
+        )
+        active_cal = round(cur.fetchone()["v"])
+
+        # Today's avg heart rate
+        cur.execute(
+            "SELECT AVG(value_num) AS avg, MIN(value_num) AS min, MAX(value_num) AS max, COUNT(*) AS cnt "
+            "FROM health_records WHERE type=%s AND local_date=CURDATE() AND value_num IS NOT NULL",
+            ("HKQuantityTypeIdentifierHeartRate",),
+        )
+        hr = cur.fetchone()
+
+        # Today's workouts
+        cur.execute("SELECT COUNT(*) AS cnt FROM workouts WHERE local_date=CURDATE()")
+        workouts = cur.fetchone()["cnt"]
+
+        # Today's record count
+        cur.execute("SELECT COUNT(*) AS cnt FROM health_records WHERE local_date=CURDATE()")
+        today_records = cur.fetchone()["cnt"]
+
+        # Today's distinct types
+        cur.execute("SELECT COUNT(DISTINCT type) AS cnt FROM health_records WHERE local_date=CURDATE()")
+        today_types = cur.fetchone()["cnt"]
+
+        # Last sync time
+        cur.execute(
+            "SELECT MAX(received_at) AS last_sync_at, COUNT(*) AS sync_count, "
+            "SUM(accepted_count) AS total_accepted "
+            "FROM ingest_events WHERE DATE(received_at)=CURDATE() AND status='completed'"
+        )
+        sync_row = cur.fetchone()
+
+        # Last sync overall
+        cur.execute("SELECT MAX(received_at) AS last_sync_at FROM ingest_events WHERE status='completed'")
+        last_sync = cur.fetchone()
+
+    return {
+        "steps": steps,
+        "active_calories": active_cal,
+        "heart_rate": {
+            "avg": round(hr["avg"], 1) if hr["avg"] else None,
+            "min": round(hr["min"], 1) if hr["min"] else None,
+            "max": round(hr["max"], 1) if hr["max"] else None,
+            "count": hr["cnt"],
+        },
+        "workouts": workouts,
+        "today_records": today_records,
+        "today_types": today_types,
+        "today_sync_count": sync_row["sync_count"] or 0,
+        "today_sync_accepted": int(sync_row["total_accepted"] or 0),
+        "today_last_sync_at": sync_row["last_sync_at"],
+        "last_sync_at": last_sync["last_sync_at"] if last_sync else None,
+    }
+
+
 @app.get("/api/stats/monthly")
 def get_monthly_stats(year: Optional[int] = Query(None)):
     conditions = ["local_date IS NOT NULL"]

@@ -289,30 +289,31 @@
         <div id="backendStatus" class="status"><span class="dot"></span><span>连接中…</span></div>
       </div>
       <div class="sync-info" id="syncInfo"></div>
+      <div class="sync-info" id="syncMeta"></div>
     </div>
   </section>
 
-  <!-- Metric cards -->
+  <!-- Metric cards (today) -->
   <section class="metric-grid">
     <div class="panel metric-card">
-      <div class="label">健康记录总数</div>
-      <div id="totalRecords" class="value">-</div>
-      <div id="recordRange" class="sub">-</div>
+      <div class="label">今日步数</div>
+      <div id="todaySteps" class="value">-</div>
+      <div id="todayStepsSub" class="sub">-</div>
     </div>
     <div class="panel metric-card">
-      <div class="label">数据类型</div>
-      <div id="typeCount" class="value">-</div>
-      <div id="typeCountSub" class="sub">HealthKit 原始类型</div>
+      <div class="label">今日心率</div>
+      <div id="todayHR" class="value">-</div>
+      <div id="todayHRSub" class="sub">-</div>
     </div>
     <div class="panel metric-card">
-      <div class="label">运动记录</div>
-      <div id="totalWorkouts" class="value">-</div>
-      <div id="workoutCalories" class="sub">-</div>
+      <div class="label">今日活动能量</div>
+      <div id="todayCal" class="value">-</div>
+      <div id="todayCalSub" class="sub">-</div>
     </div>
     <div class="panel metric-card">
-      <div class="label">累计步数</div>
-      <div id="totalSteps" class="value">-</div>
-      <div id="sleepDays" class="sub">-</div>
+      <div class="label">今日同步</div>
+      <div id="todaySync" class="value">-</div>
+      <div id="todaySyncSub" class="sub">-</div>
     </div>
   </section>
 
@@ -713,8 +714,9 @@ async function loadDashboard() {
   status.innerHTML = '<span class="dot"></span><span>正在加载…</span>';
 
   try {
-    const [overview, types, workoutSummary, workouts, syncState] = await Promise.all([
+    const [overview, today, types, workoutSummary, workouts, syncState] = await Promise.all([
       api("/api/stats/overview"),
+      api("/api/stats/today"),
       api("/api/records/types"),
       api("/api/workouts/summary"),
       api("/api/workouts?limit=10"),
@@ -726,19 +728,36 @@ async function loadDashboard() {
     document.getElementById("heroDesc").textContent =
       `数据覆盖 ${r.earliest_date || "?"} 至 ${r.latest_date || "?"}，共 ${fmtInt.format(r.total_records || 0)} 条健康记录、${fmtInt.format((overview.workouts || {}).total_workouts || 0)} 次运动。`;
 
-    // Metric cards
-    document.getElementById("totalRecords").textContent = fmtInt.format(r.total_records || 0);
-    document.getElementById("recordRange").textContent = `${r.earliest_date || "-"} ~ ${r.latest_date || "-"}`;
+    // Today metric cards
+    document.getElementById("todaySteps").textContent = fmtInt.format(today.steps || 0);
+    document.getElementById("todayStepsSub").textContent =
+      `累计 ${fmtInt.format(overview.total_steps || 0)}`;
 
-    document.getElementById("typeCount").textContent = fmtInt.format(r.distinct_types || 0);
+    const hr = today.heart_rate || {};
+    document.getElementById("todayHR").textContent =
+      hr.avg ? `${hr.avg}` : "-";
+    document.getElementById("todayHRSub").textContent =
+      hr.avg ? `${hr.min} ~ ${hr.max}（${hr.count} 次采样）` : "暂无数据";
 
-    const w = overview.workouts || {};
-    document.getElementById("totalWorkouts").textContent = fmtInt.format(w.total_workouts || 0);
-    document.getElementById("workoutCalories").textContent =
-      w.total_calories ? `${fmtInt.format(Math.round(w.total_calories))} kcal` : "-";
+    document.getElementById("todayCal").textContent =
+      today.active_calories ? `${fmtInt.format(today.active_calories)}` : "-";
+    document.getElementById("todayCalSub").textContent =
+      today.workouts > 0 ? `今日 ${today.workouts} 次运动` : "今日暂无运动";
 
-    document.getElementById("totalSteps").textContent = fmtInt.format(overview.total_steps || 0);
-    document.getElementById("sleepDays").textContent = `睡眠记录 ${fmtInt.format(overview.sleep_days || 0)} 天`;
+    document.getElementById("todaySync").textContent =
+      fmtInt.format(today.today_records || 0);
+    document.getElementById("todaySyncSub").textContent =
+      `${today.today_types || 0} 种类型 · ${today.today_sync_count || 0} 次同步`;
+
+    // Sync meta (last sync time)
+    const syncMeta = document.getElementById("syncMeta");
+    const lastSyncText = today.last_sync_at ? shortDateTime(today.last_sync_at) : "从未同步";
+    const todaySyncText = today.today_last_sync_at ? shortDateTime(today.today_last_sync_at) : "-";
+    syncMeta.innerHTML = `
+      <div class="sync-row"><span>最近同步</span><span class="val">${lastSyncText}</span></div>
+      <div class="sync-row"><span>今日最后同步</span><span class="val">${todaySyncText}</span></div>
+      <div class="sync-row"><span>今日同步接受</span><span class="val">${fmtInt.format(today.today_sync_accepted || 0)} 条</span></div>
+    `;
 
     // Steps chart
     renderStepsChart(overview.recent_steps || []);
