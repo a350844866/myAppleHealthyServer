@@ -1154,17 +1154,10 @@ def get_sleep(start: Optional[str] = Query(None), end: Optional[str] = Query(Non
 
 @app.get("/api/sleep/daily")
 def get_sleep_daily(start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
-    conditions = [
-        "type = %s",
-        "value_text <> %s",
-    ]
-    params: list = [
-        "HKCategoryTypeIdentifierSleepAnalysis",
-        "HKCategoryValueSleepAnalysisInBed",
-    ]
+    # Exclude InBed and Awake. For AsleepUnspecified, only include it on days
+    # where detailed stages (Core/Deep/REM) are absent, to avoid double-counting.
     date_conditions, date_params = build_date_filters("local_date", start, end)
-    conditions.extend(date_conditions)
-    params.extend(date_params)
+    extra_where = (" AND " + " AND ".join(date_conditions)) if date_conditions else ""
 
     with get_db() as db, db.cursor() as cur:
         cur.execute(
@@ -1174,11 +1167,33 @@ def get_sleep_daily(start: Optional[str] = Query(None), end: Optional[str] = Que
                    MIN(start_at) AS sleep_start,
                    MAX(end_at) AS sleep_end
             FROM health_records
-            WHERE {" AND ".join(conditions)}
+            WHERE type = %s
+              AND value_text NOT IN (%s, %s)
+              AND (
+                  value_text <> %s
+                  OR local_date NOT IN (
+                      SELECT DISTINCT local_date FROM health_records
+                      WHERE type = %s
+                        AND value_text IN (%s, %s, %s)
+                        {extra_where}
+                  )
+              )
+              {extra_where}
             GROUP BY local_date
             ORDER BY local_date
             """,
-            params,
+            [
+                "HKCategoryTypeIdentifierSleepAnalysis",
+                "HKCategoryValueSleepAnalysisInBed",
+                "HKCategoryValueSleepAnalysisAwake",
+                "HKCategoryValueSleepAnalysisAsleepUnspecified",
+                "HKCategoryTypeIdentifierSleepAnalysis",
+                "HKCategoryValueSleepAnalysisAsleepCore",
+                "HKCategoryValueSleepAnalysisAsleepDeep",
+                "HKCategoryValueSleepAnalysisAsleepREM",
+                *date_params,
+                *date_params,
+            ],
         )
         return rows_to_list(cur.fetchall())
 

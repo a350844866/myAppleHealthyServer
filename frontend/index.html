@@ -386,17 +386,67 @@ function humanMinutes(m) {
   return `${(m / 60).toFixed(1)} 小时`;
 }
 
-// Shorten HK type names for display
+// HK type → Chinese display name
+const TYPE_NAMES = {
+  StepCount: "步数", HeartRate: "心率", ActiveEnergyBurned: "活动能量",
+  BasalEnergyBurned: "基础代谢", DistanceWalkingRunning: "步行+跑步距离",
+  FlightsClimbed: "爬楼层数", AppleExerciseTime: "锻炼时间",
+  AppleStandTime: "站立时间", HeartRateVariabilitySDNN: "心率变异性",
+  RestingHeartRate: "静息心率", WalkingHeartRateAverage: "步行平均心率",
+  OxygenSaturation: "血氧饱和度", RespiratoryRate: "呼吸频率",
+  BodyMass: "体重", Height: "身高", BodyFatPercentage: "体脂率",
+  BodyMassIndex: "BMI", LeanBodyMass: "去脂体重",
+  VO2Max: "最大摄氧量", BodyTemperature: "体温",
+  DistanceCycling: "骑行距离", DistanceSwimming: "游泳距离",
+  SwimmingStrokeCount: "游泳划水次数",
+  RunningSpeed: "跑步速度", RunningPower: "跑步功率",
+  RunningStrideLength: "跑步步幅", RunningGroundContactTime: "触地时间",
+  RunningVerticalOscillation: "垂直振幅",
+  WalkingSpeed: "步行速度", WalkingStepLength: "步行步幅",
+  WalkingAsymmetryPercentage: "步行不对称", WalkingDoubleSupportPercentage: "双脚支撑",
+  AppleWalkingSteadiness: "步行稳定性",
+  EnvironmentalAudioExposure: "环境音量", HeadphoneAudioExposure: "耳机音量",
+  SixMinuteWalkTestDistance: "6分钟步行距离",
+  PhysicalEffort: "体力消耗", TimeInDaylight: "日光时间",
+  AppleSleepingWristTemperature: "睡眠腕温",
+  HeartRateRecoveryOneMinute: "心率恢复(1分钟)",
+  AtrialFibrillationBurden: "房颤负担",
+  DistanceWheelchair: "轮椅距离", DistanceDownhillSnowSports: "滑雪距离",
+  PushCount: "推动次数",
+  SleepAnalysis: "睡眠分析",
+  AudioExposureEvent: "音频暴露事件", HandwashingEvent: "洗手事件",
+  HighHeartRateEvent: "高心率事件", LowHeartRateEvent: "低心率事件",
+  IrregularHeartRhythmEvent: "心律不齐事件", LowCardioFitnessEvent: "低心肺事件",
+};
+
 function shortType(t) {
-  return (t || "")
+  const key = (t || "")
     .replace("HKQuantityTypeIdentifier", "")
     .replace("HKCategoryTypeIdentifier", "")
     .replace("HKDataType", "");
+  return TYPE_NAMES[key] || key;
 }
 
-// Shorten workout activity type
+const ACTIVITY_NAMES = {
+  Running: "跑步", Walking: "步行", Cycling: "骑行", Swimming: "游泳",
+  Hiking: "徒步", Yoga: "瑜伽", FunctionalStrengthTraining: "力量训练",
+  TraditionalStrengthTraining: "传统力量训练",
+  HighIntensityIntervalTraining: "HIIT", Dance: "舞蹈",
+  Elliptical: "椭圆机", Rowing: "划船", Stairmaster: "爬楼机",
+  CoreTraining: "核心训练", Flexibility: "柔韧训练",
+  MindAndBody: "身心训练", Pilates: "普拉提",
+  TableTennis: "乒乓球", Badminton: "羽毛球", Tennis: "网球",
+  Basketball: "篮球", Soccer: "足球", Volleyball: "排球",
+  Golf: "高尔夫", Baseball: "棒球", Softball: "垒球",
+  MartialArts: "武术", Boxing: "拳击", Kickboxing: "跆拳道",
+  Climbing: "攀岩", Skiing: "滑雪", Snowboarding: "单板滑雪",
+  Surfing: "冲浪", WaterPolo: "水球", Skateboarding: "滑板",
+  JumpRope: "跳绳", Cooldown: "放松整理", Other: "其他",
+};
+
 function shortActivity(t) {
-  return (t || "").replace("HKWorkoutActivityType", "");
+  const key = (t || "").replace("HKWorkoutActivityType", "");
+  return ACTIVITY_NAMES[key] || key;
 }
 
 async function api(path) {
