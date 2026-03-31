@@ -1,0 +1,10 @@
+.git
+.gitignore
+backend/.venv
+backend/__pycache__
+backend/*.pyc
+backend/*.pyo
+frontend/.DS_Store
+apple_health_export
+apple_health_export.zip
+

@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: myapplehealthy-backend
+    restart: unless-stopped
+    ports:
+      - "18000:18000"
+    volumes:
+      - ./apple_health_export:/app/apple_health_export:ro
+    environment:
+      HEALTH_DB_HOST: ${HEALTH_DB_HOST:-host.docker.internal}
+      HEALTH_DB_PORT: ${HEALTH_DB_PORT:-3306}
+      HEALTH_DB_USER: ${HEALTH_DB_USER:-root}
+      HEALTH_DB_PASSWORD: ${HEALTH_DB_PASSWORD:?HEALTH_DB_PASSWORD is required}
+      HEALTH_DB_NAME: ${HEALTH_DB_NAME:-apple_health}
+      HEALTH_LOCAL_TZ: ${HEALTH_LOCAL_TZ:-Asia/Shanghai}
+      INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
+      IMPORT_STALE_SECONDS: ${IMPORT_STALE_SECONDS:-300}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  importer:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      HEALTH_DB_HOST: ${HEALTH_DB_HOST:-host.docker.internal}
+      HEALTH_DB_PORT: ${HEALTH_DB_PORT:-3306}
+      HEALTH_DB_USER: ${HEALTH_DB_USER:-root}
+      HEALTH_DB_PASSWORD: ${HEALTH_DB_PASSWORD:?HEALTH_DB_PASSWORD is required}
+      HEALTH_DB_NAME: ${HEALTH_DB_NAME:-apple_health}
+      HEALTH_LOCAL_TZ: ${HEALTH_LOCAL_TZ:-Asia/Shanghai}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./apple_health_export:/app/apple_health_export:ro
+    entrypoint: ["python", "backend/importer.py"]

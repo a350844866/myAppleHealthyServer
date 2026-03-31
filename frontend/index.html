@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apple Health Dashboard</title>
+  <style>
+    :root {
+      --bg: #f5efe4;
+      --panel: rgba(255, 252, 247, 0.92);
+      --line: #d9ccb7;
+      --text: #2f261d;
+      --muted: #766a5d;
+      --accent: #d35d47;
+      --accent-2: #3f7d6b;
+      --shadow: 0 20px 40px rgba(69, 48, 28, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(211, 93, 71, 0.18), transparent 32%),
+        radial-gradient(circle at left bottom, rgba(63, 125, 107, 0.15), transparent 28%),
+        linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    .shell {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(118, 106, 93, 0.12);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-main {
+      padding: 28px;
+    }
+
+    .hero-main h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-main p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 720px;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .hero-side {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 220px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .metric-card {
+      padding: 18px;
+      min-height: 120px;
+    }
+
+    .metric-card .label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .metric-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .metric-card .sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+    }
+
+    .panel-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .chart-panel,
+    .table-panel {
+      padding: 22px;
+    }
+
+    .bars {
+      display: grid;
+      align-items: end;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+      height: 220px;
+      margin-top: 24px;
+    }
+
+    .bar-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: end;
+      align-items: center;
+      gap: 10px;
+      height: 100%;
+    }
+
+    .bar {
+      width: 100%;
+      max-width: 68px;
+      border-radius: 18px 18px 8px 8px;
+      background: linear-gradient(180deg, #e88972 0%, var(--accent) 100%);
+      min-height: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.28), transparent 46%);
+    }
+
+    .bar-col .day {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .bar-col .num {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table th,
+    .table td {
+      padding: 12px 0;
+      text-align: left;
+      border-bottom: 1px solid rgba(118, 106, 93, 0.12);
+      font-size: 14px;
+    }
+
+    .table th {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(63, 125, 107, 0.12);
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 0 6px rgba(63, 125, 107, 0.12);
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      align-items: center;
+    }
+
+    .toolbar button {
+      border: none;
+      border-radius: 12px;
+      background: var(--text);
+      color: white;
+      padding: 12px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .toolbar .hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hero-meta {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .hero-meta .meta-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .hero-meta .meta-value {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 14px;
+      padding: 20px 0 6px;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="panel hero-main">
+        <div class="eyebrow">Self Health System</div>
+        <h1>Apple Health<br>Personal Dashboard</h1>
+        <p>这是一个先跑起来的 MVP。它直接读取你自建后端的聚合接口，展示近 7 天步数、最近睡眠、主要记录类型、运动汇总和系统状态，后面可以继续扩展告警、路线回放、日记和 AI 分析。</p>
+        <div class="toolbar">
+          <button id="reloadBtn">刷新</button>
+          <div id="apiHint" class="hint"></div>
+        </div>
+        <div class="hero-meta">
+          <div>
+            <div class="meta-label">导入批次</div>
+            <div id="importBatchMeta" class="meta-value">-</div>
+          </div>
+          <div>
+            <div class="meta-label">最近文件状态</div>
+            <div id="importFileMeta" class="meta-value">-</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel hero-side">
+        <div>
+          <div class="eyebrow">Backend</div>
+          <div id="backendStatus" class="status"><span class="dot"></span><span>等待连接 API</span></div>
+        </div>
+        <div>
+          <div class="label">当前目标</div>
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.03em;">健康监控底座</div>
+          <div class="sub" style="margin-top:8px;color:var(--muted);">先把导入、聚合、展示跑稳，再叠加每 5 分钟增量同步和健康告警。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="metric-grid">
+      <div class="panel metric-card">
+        <div class="label">已导入记录</div>
+        <div id="totalRecords" class="value">-</div>
+        <div id="recordRange" class="sub">-</div>
+      </div>
+      <div class="panel metric-card">
+        <div class="label">导入文件进度</div>
+        <div id="totalWorkouts" class="value">-</div>
+        <div id="workoutCalories" class="sub">-</div>
+      </div>
+      <div class="panel metric-card">
+        <div class="label">工作表状态</div>
+        <div id="totalSteps" class="value">-</div>
+        <div id="sleepDays" class="sub">-</div>
+      </div>
+      <div class="panel metric-card">
+        <div class="label">数据类型数</div>
+        <div id="typeCount" class="value">-</div>
+        <div id="typeCountSub" class="sub">等待聚合接口</div>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <div class="stack">
+        <div class="panel chart-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">最近 7 天步数</h2>
+              <div class="panel-subtitle">直接来自 `/api/stats/overview`</div>
+            </div>
+            <span class="pill">Daily Trend</span>
+          </div>
+          <div id="stepsChart" class="bars"></div>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">最近睡眠</h2>
+              <div class="panel-subtitle">最近 10 天的睡眠汇总</div>
+            </div>
+            <span class="pill">Sleep</span>
+          </div>
+          <table class="table">
+            <thead>
+              <tr><th>日期</th><th>总时长</th><th>睡眠开始</th><th>睡眠结束</th></tr>
+            </thead>
+            <tbody id="sleepTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="panel table-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">主要记录类型</h2>
+              <div class="panel-subtitle">按数量排序前 8 项</div>
+            </div>
+            <span class="pill">Top Types</span>
+          </div>
+          <table class="table">
+            <thead>
+              <tr><th>类型</th><th>数量</th><th>时间范围</th></tr>
+            </thead>
+            <tbody id="typesTable"></tbody>
+          </table>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">运动摘要</h2>
+              <div class="panel-subtitle">按运动类型聚合</div>
+            </div>
+            <span class="pill">Workout</span>
+          </div>
+          <table class="table">
+            <thead>
+              <tr><th>类型</th><th>次数</th><th>总分钟</th></tr>
+            </thead>
+            <tbody id="workoutTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const fmtInt = new Intl.NumberFormat("zh-CN");
+
+    function shortDate(value) {
+      if (!value) return "-";
+      return String(value).slice(5, 10);
+    }
+
+    function shortDateTime(value) {
+      if (!value) return "-";
+      return String(value).replace("T", " ").slice(0, 16);
+    }
+
+    function humanMinutes(value) {
+      if (value == null || Number.isNaN(Number(value))) return "-";
+      const minutes = Number(value);
+      if (minutes < 1) return "<1 分钟";
+      if (minutes < 60) return `${minutes.toFixed(1)} 分钟`;
+      return `${(minutes / 60).toFixed(1)} 小时`;
+    }
+
+    function setEmptyTable(targetId, colspan, message) {
+      const target = document.getElementById(targetId);
+      target.innerHTML = `<tr><td colspan="${colspan}" class="empty">${message}</td></tr>`;
+    }
+
+    async function fetchJson(base, path) {
+      const res = await fetch(`${base}${path}`);
+      if (!res.ok) {
+        throw new Error(`${path} ${res.status}`);
+      }
+      return res.json();
+    }
+
+    function renderStepsChart(items) {
+      const root = document.getElementById("stepsChart");
+      root.innerHTML = "";
+      if (!items.length) {
+        root.innerHTML = '<div class="empty">暂无步数数据</div>';
+        return;
+      }
+      const max = Math.max(...items.map(item => Number(item.steps || 0)), 1);
+      for (const item of items) {
+        const col = document.createElement("div");
+        col.className = "bar-col";
+        const height = Math.max(6, Math.round((Number(item.steps || 0) / max) * 180));
+        col.innerHTML = `
+          <div class="num">${fmtInt.format(Math.round(item.steps || 0))}</div>
+          <div class="bar" style="height:${height}px"></div>
+          <div class="day">${shortDate(item.date)}</div>
+        `;
+        root.appendChild(col);
+      }
+    }
+
+    function renderRows(targetId, rows, render) {
+      const target = document.getElementById(targetId);
+      target.innerHTML = "";
+      if (!rows.length) {
+        target.innerHTML = '<tr><td colspan="4" class="empty">暂无数据</td></tr>';
+        return;
+      }
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = render(row);
+        target.appendChild(tr);
+      }
+    }
+
+    let loadingDashboard = false;
+
+    async function loadDashboard() {
+      if (loadingDashboard) return;
+      loadingDashboard = true;
+      const base = window.location.origin;
+      document.getElementById("apiHint").textContent = `API: ${base}/api`;
+      const status = document.getElementById("backendStatus");
+      status.innerHTML = '<span class="dot"></span><span>正在加载 API 数据</span>';
+
+      try {
+        const [importStatus, workouts] = await Promise.all([
+          fetchJson(base, "/api/import-status"),
+          fetchJson(base, "/api/workouts/summary"),
+        ]);
+
+        const batch = importStatus.batch || {};
+        const files = importStatus.files || {};
+        const tables = importStatus.tables || {};
+        const batchStatus = batch.status || "idle";
+        const importing = batchStatus === "running";
+        const stalled = Boolean(files.stalled);
+        const recordProgress = files.record_progress_percent;
+        const totalEstimate = files.estimated_total_records;
+        const eta = files.eta_minutes;
+        const speedWindowMinutes = files.speed_window_minutes || 10;
+        const lastProgressAt = files.last_progress_at;
+        const estimatedCompletionAt = files.estimated_completion_at;
+        const xmlRecordsSeen = files.xml_records_seen ?? files.records_seen ?? 0;
+
+        document.getElementById("importBatchMeta").textContent = batch.id
+          ? `#${batch.id} ${batch.batch_type || "-"} / ${batchStatus}`
+          : "暂无导入批次";
+        document.getElementById("importFileMeta").textContent = files.total
+          ? `${fmtInt.format(xmlRecordsSeen)} / ${fmtInt.format(totalEstimate || 0)} Record`
+          : "暂无文件记录";
+
+        document.getElementById("totalRecords").textContent = fmtInt.format(
+          files.records_inserted || tables.health_records_max_id || 0
+        );
+        document.getElementById("recordRange").textContent = importing
+          ? `已扫描 ${fmtInt.format(xmlRecordsSeen)} 条 / 预计 ${fmtInt.format(totalEstimate || 0)} 条`
+          : `表内最大 ID ${fmtInt.format(tables.health_records_max_id || 0)}`;
+
+        document.getElementById("totalWorkouts").textContent = recordProgress == null
+          ? "-"
+          : `${recordProgress}%`;
+        document.getElementById("workoutCalories").textContent = importing
+          ? `近 ${speedWindowMinutes} 分钟 ${fmtInt.format(Math.round(files.scan_rate_per_minute || 0))} 条/分钟 / 预计 ${estimatedCompletionAt ? shortDateTime(estimatedCompletionAt) : humanMinutes(eta)} 完成`
+          : "导入已结束";
+
+        document.getElementById("totalSteps").textContent = stalled ? "疑似卡住" : (tables.profile_ready ? "已就绪" : "未就绪");
+        document.getElementById("sleepDays").textContent = stalled
+          ? `最近进度 ${files.seconds_since_progress || 0} 秒前`
+          : `最近心跳 ${shortDateTime(lastProgressAt)} / Workout ${fmtInt.format(tables.workouts || 0)} / ECG ${fmtInt.format(tables.ecg_readings || 0)}`;
+
+        if (importing) {
+          document.getElementById("typeCount").textContent = fmtInt.format(files.records_inserted || 0);
+          document.getElementById("typeCountSub").textContent = "本轮新增写入记录";
+          renderStepsChart([]);
+          setEmptyTable("typesTable", 3, stalled ? "导入疑似卡住，请检查 importer 进程与 MySQL processlist" : "导入进行中，已暂停类型聚合查询");
+          setEmptyTable("sleepTable", 4, stalled ? "导入疑似卡住，请刷新或查看 /api/import-status" : "导入进行中，已暂停睡眠聚合查询");
+        } else {
+          const [overview, types, sleep] = await Promise.all([
+            fetchJson(base, "/api/stats/overview"),
+            fetchJson(base, "/api/records/types"),
+            fetchJson(base, "/api/sleep/daily"),
+          ]);
+
+          document.getElementById("typeCount").textContent = fmtInt.format(overview.records.distinct_types || 0);
+          document.getElementById("typeCountSub").textContent = "HealthKit 原始类型";
+          document.getElementById("recordRange").textContent = `${overview.records.earliest_date || "-"} 到 ${overview.records.latest_date || "-"}`;
+          document.getElementById("totalSteps").textContent = fmtInt.format(overview.total_steps || 0);
+          document.getElementById("sleepDays").textContent = `睡眠记录天数 ${fmtInt.format(overview.sleep_days || 0)}`;
+          renderStepsChart(overview.recent_steps || []);
+          renderRows("typesTable", (types || []).slice(0, 8), row => `
+            <td>${row.type}</td>
+            <td>${fmtInt.format(row.count || 0)}</td>
+            <td>${shortDate(row.first_date)} - ${shortDate(row.last_date)}</td>
+          `);
+          renderRows("sleepTable", (sleep || []).slice(-10).reverse(), row => `
+            <td>${row.date}</td>
+            <td>${Number(row.total_hours || 0).toFixed(2)} h</td>
+            <td>${shortDateTime(row.sleep_start)}</td>
+            <td>${shortDateTime(row.sleep_end)}</td>
+          `);
+        }
+
+        renderRows("workoutTable", (workouts || []).slice(0, 8), row => `
+          <td>${row.activity_type}</td>
+          <td>${fmtInt.format(row.count || 0)}</td>
+          <td>${fmtInt.format(Math.round(row.total_minutes || 0))}</td>
+        `);
+
+        status.innerHTML = stalled
+          ? `<span class="dot" style="background:#d35d47;box-shadow:0 0 0 6px rgba(211,93,71,.12)"></span><span>API 已连接 / 导入疑似卡住 / 最近心跳 ${shortDateTime(lastProgressAt)}</span>`
+          : `<span class="dot"></span><span>API 已连接 / 导入状态 ${batchStatus} / 进度 ${recordProgress == null ? "-" : `${recordProgress}%`}</span>`;
+      } catch (error) {
+        status.innerHTML = `<span class="dot" style="background:#d35d47;box-shadow:0 0 0 6px rgba(211,93,71,.12)"></span><span>${error.message}</span>`;
+      } finally {
+        loadingDashboard = false;
+      }
+    }
+
+    document.getElementById("reloadBtn").addEventListener("click", loadDashboard);
+    loadDashboard();
+    window.setInterval(loadDashboard, 15000);
+  </script>
+</body>
+</html>
