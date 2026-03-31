@@ -13,15 +13,13 @@
       --muted: #766a5d;
       --accent: #d35d47;
       --accent-2: #3f7d6b;
+      --accent-3: #4a7fc4;
       --shadow: 0 20px 40px rgba(69, 48, 28, 0.08);
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; margin: 0; }
 
     body {
-      margin: 0;
       font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", sans-serif;
       color: var(--text);
       background:
@@ -31,12 +29,9 @@
       min-height: 100vh;
     }
 
-    .shell {
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 28px 20px 48px;
-    }
+    .shell { max-width: 1280px; margin: 0 auto; padding: 28px 20px 48px; }
 
+    /* ── Hero ── */
     .hero {
       display: grid;
       grid-template-columns: 1.5fr 1fr;
@@ -52,31 +47,21 @@
       backdrop-filter: blur(12px);
     }
 
-    .hero-main {
-      padding: 28px;
-    }
-
+    .hero-main { padding: 28px; }
     .hero-main h1 {
-      margin: 0 0 10px;
-      font-size: clamp(30px, 5vw, 52px);
+      font-size: clamp(30px, 5vw, 48px);
       line-height: 0.95;
       letter-spacing: -0.04em;
+      margin-bottom: 10px;
     }
-
-    .hero-main p {
-      margin: 0;
-      color: var(--muted);
-      max-width: 720px;
-      line-height: 1.6;
-      font-size: 15px;
-    }
+    .hero-main p { color: var(--muted); max-width: 720px; line-height: 1.6; font-size: 15px; }
 
     .hero-side {
       padding: 24px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      min-height: 220px;
+      min-height: 200px;
     }
 
     .eyebrow {
@@ -87,46 +72,29 @@
       margin-bottom: 14px;
     }
 
+    .sync-info { display: grid; gap: 8px; margin-top: 14px; }
+    .sync-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+    .sync-row .val { font-weight: 600; color: var(--text); }
+
+    /* ── Metric cards ── */
     .metric-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
       margin-bottom: 18px;
     }
+    .metric-card { padding: 18px; min-height: 110px; }
+    .metric-card .label { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+    .metric-card .value { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+    .metric-card .sub { color: var(--muted); font-size: 13px; margin-top: 8px; }
 
-    .metric-card {
-      padding: 18px;
-      min-height: 120px;
-    }
-
-    .metric-card .label {
-      color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 10px;
-    }
-
-    .metric-card .value {
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-    }
-
-    .metric-card .sub {
-      color: var(--muted);
-      font-size: 13px;
-      margin-top: 8px;
-    }
-
+    /* ── Content grid ── */
     .content-grid {
       display: grid;
       grid-template-columns: 1.1fr 0.9fr;
       gap: 18px;
     }
-
-    .stack {
-      display: grid;
-      gap: 18px;
-    }
+    .stack { display: grid; gap: 18px; }
 
     .panel-header {
       display: flex;
@@ -135,85 +103,10 @@
       align-items: center;
       margin-bottom: 18px;
     }
+    .panel-title { font-size: 20px; letter-spacing: -0.03em; }
+    .panel-subtitle { color: var(--muted); font-size: 13px; }
 
-    .panel-title {
-      margin: 0;
-      font-size: 20px;
-      letter-spacing: -0.03em;
-    }
-
-    .panel-subtitle {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .chart-panel,
-    .table-panel {
-      padding: 22px;
-    }
-
-    .bars {
-      display: grid;
-      align-items: end;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 10px;
-      height: 220px;
-      margin-top: 24px;
-    }
-
-    .bar-col {
-      display: flex;
-      flex-direction: column;
-      justify-content: end;
-      align-items: center;
-      gap: 10px;
-      height: 100%;
-    }
-
-    .bar {
-      width: 100%;
-      max-width: 68px;
-      border-radius: 18px 18px 8px 8px;
-      background: linear-gradient(180deg, #e88972 0%, var(--accent) 100%);
-      min-height: 4px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .bar::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.28), transparent 46%);
-    }
-
-    .bar-col .day {
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .bar-col .num {
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .table th,
-    .table td {
-      padding: 12px 0;
-      text-align: left;
-      border-bottom: 1px solid rgba(118, 106, 93, 0.12);
-      font-size: 14px;
-    }
-
-    .table th {
-      color: var(--muted);
-      font-weight: 500;
-    }
+    .chart-panel, .table-panel { padding: 22px; }
 
     .pill {
       display: inline-block;
@@ -224,6 +117,59 @@
       font-size: 12px;
       font-weight: 600;
     }
+    .pill.red { background: rgba(211, 93, 71, 0.12); color: var(--accent); }
+    .pill.blue { background: rgba(74, 127, 196, 0.12); color: var(--accent-3); }
+
+    /* ── Bar chart ── */
+    .bars {
+      display: grid;
+      align-items: end;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+      height: 200px;
+      margin-top: 16px;
+    }
+    .bar-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: end;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+    }
+    .bar {
+      width: 100%;
+      max-width: 68px;
+      border-radius: 18px 18px 8px 8px;
+      background: linear-gradient(180deg, #e88972 0%, var(--accent) 100%);
+      min-height: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+    .bar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.28), transparent 46%);
+    }
+    .bar-col .day { font-size: 12px; color: var(--muted); }
+    .bar-col .num { font-size: 12px; font-weight: 600; }
+
+    /* ── Line chart (canvas) ── */
+    .line-chart-wrap { position: relative; height: 180px; margin-top: 10px; }
+    .line-chart-wrap canvas { width: 100%; height: 100%; }
+
+    /* ── Table ── */
+    .table { width: 100%; border-collapse: collapse; }
+    .table th, .table td {
+      padding: 10px 0;
+      text-align: left;
+      border-bottom: 1px solid rgba(118, 106, 93, 0.12);
+      font-size: 14px;
+    }
+    .table th { color: var(--muted); font-weight: 500; }
+
+    .empty { color: var(--muted); font-size: 14px; padding: 20px 0 6px; }
 
     .status {
       display: inline-flex;
@@ -232,379 +178,505 @@
       color: var(--muted);
       font-size: 13px;
     }
-
     .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
+      width: 9px; height: 9px; border-radius: 50%;
       background: var(--accent-2);
       box-shadow: 0 0 0 6px rgba(63, 125, 107, 0.12);
     }
-
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-top: 18px;
-      align-items: center;
+    .dot.red {
+      background: var(--accent);
+      box-shadow: 0 0 0 6px rgba(211, 93, 71, 0.12);
     }
 
+    .toolbar { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
     .toolbar button {
-      border: none;
-      border-radius: 12px;
-      background: var(--text);
-      color: white;
-      padding: 12px 16px;
-      font-weight: 600;
-      cursor: pointer;
+      border: none; border-radius: 12px;
+      background: var(--text); color: white;
+      padding: 12px 16px; font-weight: 600; cursor: pointer;
     }
+    .toolbar button:hover { opacity: 0.85; }
+    .toolbar .hint { color: var(--muted); font-size: 13px; }
 
-    .toolbar .hint {
-      color: var(--muted);
-      font-size: 13px;
+    /* ── Date range picker ── */
+    .date-range { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .date-range button {
+      border: 1px solid var(--line); border-radius: 10px;
+      background: transparent; color: var(--muted);
+      padding: 6px 12px; font-size: 13px; cursor: pointer;
     }
-
-    .hero-meta {
-      display: grid;
-      gap: 10px;
-      margin-top: 18px;
-    }
-
-    .hero-meta .meta-label {
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-    }
-
-    .hero-meta .meta-value {
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .empty {
-      color: var(--muted);
-      font-size: 14px;
-      padding: 20px 0 6px;
+    .date-range button.active {
+      background: var(--text); color: white; border-color: var(--text);
     }
 
     @media (max-width: 980px) {
-      .hero,
-      .content-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .metric-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+      .hero, .content-grid { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-
     @media (max-width: 640px) {
-      .metric-grid {
-        grid-template-columns: 1fr;
-      }
+      .metric-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <section class="hero">
-      <div class="panel hero-main">
-        <div class="eyebrow">Self Health System</div>
-        <h1>Apple Health<br>Personal Dashboard</h1>
-        <p>这是一个先跑起来的 MVP。它直接读取你自建后端的聚合接口，展示近 7 天步数、最近睡眠、主要记录类型、运动汇总和系统状态，后面可以继续扩展告警、路线回放、日记和 AI 分析。</p>
-        <div class="toolbar">
-          <button id="reloadBtn">刷新</button>
-          <div id="apiHint" class="hint"></div>
-        </div>
-        <div class="hero-meta">
+<div class="shell">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="panel hero-main">
+      <div class="eyebrow">Self Health System</div>
+      <h1>Apple Health<br>Dashboard</h1>
+      <p id="heroDesc">加载中…</p>
+      <div class="toolbar">
+        <button id="reloadBtn">刷新</button>
+        <span id="apiHint" class="hint"></span>
+      </div>
+    </div>
+    <div class="panel hero-side">
+      <div>
+        <div class="eyebrow">同步状态</div>
+        <div id="backendStatus" class="status"><span class="dot"></span><span>连接中…</span></div>
+      </div>
+      <div class="sync-info" id="syncInfo"></div>
+    </div>
+  </section>
+
+  <!-- Metric cards -->
+  <section class="metric-grid">
+    <div class="panel metric-card">
+      <div class="label">健康记录总数</div>
+      <div id="totalRecords" class="value">-</div>
+      <div id="recordRange" class="sub">-</div>
+    </div>
+    <div class="panel metric-card">
+      <div class="label">数据类型</div>
+      <div id="typeCount" class="value">-</div>
+      <div id="typeCountSub" class="sub">HealthKit 原始类型</div>
+    </div>
+    <div class="panel metric-card">
+      <div class="label">运动记录</div>
+      <div id="totalWorkouts" class="value">-</div>
+      <div id="workoutCalories" class="sub">-</div>
+    </div>
+    <div class="panel metric-card">
+      <div class="label">累计步数</div>
+      <div id="totalSteps" class="value">-</div>
+      <div id="sleepDays" class="sub">-</div>
+    </div>
+  </section>
+
+  <!-- Charts & Tables -->
+  <section class="content-grid">
+    <div class="stack">
+      <!-- Steps bar chart -->
+      <div class="panel chart-panel">
+        <div class="panel-header">
           <div>
-            <div class="meta-label">导入批次</div>
-            <div id="importBatchMeta" class="meta-value">-</div>
+            <h2 class="panel-title">近 7 天步数</h2>
+            <div class="panel-subtitle">每日步数汇总</div>
           </div>
+          <span class="pill red">Steps</span>
+        </div>
+        <div id="stepsChart" class="bars"></div>
+      </div>
+
+      <!-- Heart rate chart -->
+      <div class="panel chart-panel">
+        <div class="panel-header">
           <div>
-            <div class="meta-label">最近文件状态</div>
-            <div id="importFileMeta" class="meta-value">-</div>
+            <h2 class="panel-title">心率趋势</h2>
+            <div class="panel-subtitle" id="hrSubtitle">近 30 天每日平均 / 最低 / 最高</div>
           </div>
+          <span class="pill">Heart Rate</span>
+        </div>
+        <div class="date-range" id="hrRange">
+          <button data-days="7">7天</button>
+          <button data-days="30" class="active">30天</button>
+          <button data-days="90">90天</button>
+        </div>
+        <div class="line-chart-wrap">
+          <canvas id="hrCanvas"></canvas>
         </div>
       </div>
-      <div class="panel hero-side">
-        <div>
-          <div class="eyebrow">Backend</div>
-          <div id="backendStatus" class="status"><span class="dot"></span><span>等待连接 API</span></div>
-        </div>
-        <div>
-          <div class="label">当前目标</div>
-          <div style="font-size:28px;font-weight:700;letter-spacing:-0.03em;">健康监控底座</div>
-          <div class="sub" style="margin-top:8px;color:var(--muted);">先把导入、聚合、展示跑稳，再叠加每 5 分钟增量同步和健康告警。</div>
-        </div>
-      </div>
-    </section>
 
-    <section class="metric-grid">
-      <div class="panel metric-card">
-        <div class="label">已导入记录</div>
-        <div id="totalRecords" class="value">-</div>
-        <div id="recordRange" class="sub">-</div>
-      </div>
-      <div class="panel metric-card">
-        <div class="label">导入文件进度</div>
-        <div id="totalWorkouts" class="value">-</div>
-        <div id="workoutCalories" class="sub">-</div>
-      </div>
-      <div class="panel metric-card">
-        <div class="label">工作表状态</div>
-        <div id="totalSteps" class="value">-</div>
-        <div id="sleepDays" class="sub">-</div>
-      </div>
-      <div class="panel metric-card">
-        <div class="label">数据类型数</div>
-        <div id="typeCount" class="value">-</div>
-        <div id="typeCountSub" class="sub">等待聚合接口</div>
-      </div>
-    </section>
-
-    <section class="content-grid">
-      <div class="stack">
-        <div class="panel chart-panel">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">最近 7 天步数</h2>
-              <div class="panel-subtitle">直接来自 `/api/stats/overview`</div>
-            </div>
-            <span class="pill">Daily Trend</span>
+      <!-- Sleep chart -->
+      <div class="panel chart-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">睡眠时长</h2>
+            <div class="panel-subtitle" id="sleepSubtitle">近 30 天每日睡眠小时数</div>
           </div>
-          <div id="stepsChart" class="bars"></div>
+          <span class="pill blue">Sleep</span>
         </div>
-
-        <div class="panel table-panel">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">最近睡眠</h2>
-              <div class="panel-subtitle">最近 10 天的睡眠汇总</div>
-            </div>
-            <span class="pill">Sleep</span>
-          </div>
-          <table class="table">
-            <thead>
-              <tr><th>日期</th><th>总时长</th><th>睡眠开始</th><th>睡眠结束</th></tr>
-            </thead>
-            <tbody id="sleepTable"></tbody>
-          </table>
+        <div class="date-range" id="sleepRange">
+          <button data-days="7">7天</button>
+          <button data-days="30" class="active">30天</button>
+          <button data-days="90">90天</button>
+        </div>
+        <div class="line-chart-wrap">
+          <canvas id="sleepCanvas"></canvas>
         </div>
       </div>
+    </div>
 
-      <div class="stack">
-        <div class="panel table-panel">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">主要记录类型</h2>
-              <div class="panel-subtitle">按数量排序前 8 项</div>
-            </div>
-            <span class="pill">Top Types</span>
+    <div class="stack">
+      <!-- Record types -->
+      <div class="panel table-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">主要记录类型</h2>
+            <div class="panel-subtitle">按数量排序前 10 项</div>
           </div>
-          <table class="table">
-            <thead>
-              <tr><th>类型</th><th>数量</th><th>时间范围</th></tr>
-            </thead>
-            <tbody id="typesTable"></tbody>
-          </table>
+          <span class="pill">Top Types</span>
         </div>
-
-        <div class="panel table-panel">
-          <div class="panel-header">
-            <div>
-              <h2 class="panel-title">运动摘要</h2>
-              <div class="panel-subtitle">按运动类型聚合</div>
-            </div>
-            <span class="pill">Workout</span>
-          </div>
-          <table class="table">
-            <thead>
-              <tr><th>类型</th><th>次数</th><th>总分钟</th></tr>
-            </thead>
-            <tbody id="workoutTable"></tbody>
-          </table>
-        </div>
+        <table class="table">
+          <thead><tr><th>类型</th><th>数量</th><th>时间范围</th></tr></thead>
+          <tbody id="typesTable"></tbody>
+        </table>
       </div>
-    </section>
-  </div>
 
-  <script>
-    const fmtInt = new Intl.NumberFormat("zh-CN");
+      <!-- Workouts -->
+      <div class="panel table-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">运动汇总</h2>
+            <div class="panel-subtitle">按运动类型聚合</div>
+          </div>
+          <span class="pill red">Workout</span>
+        </div>
+        <table class="table">
+          <thead><tr><th>类型</th><th>次数</th><th>总时长</th><th>总卡路里</th></tr></thead>
+          <tbody id="workoutTable"></tbody>
+        </table>
+      </div>
 
-    function shortDate(value) {
-      if (!value) return "-";
-      return String(value).slice(5, 10);
+      <!-- Recent workouts -->
+      <div class="panel table-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">最近运动</h2>
+            <div class="panel-subtitle">最新 10 次运动记录</div>
+          </div>
+          <span class="pill blue">Recent</span>
+        </div>
+        <table class="table">
+          <thead><tr><th>日期</th><th>类型</th><th>时长</th><th>卡路里</th></tr></thead>
+          <tbody id="recentWorkoutTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const fmtInt = new Intl.NumberFormat("zh-CN");
+const BASE = window.location.origin;
+
+function shortDate(v) { return v ? String(v).slice(5, 10) : "-"; }
+function shortDateTime(v) { return v ? String(v).replace("T", " ").slice(0, 16) : "-"; }
+
+function dateDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function humanMinutes(m) {
+  if (m == null) return "-";
+  m = Number(m);
+  if (m < 60) return `${Math.round(m)} 分钟`;
+  return `${(m / 60).toFixed(1)} 小时`;
+}
+
+// Shorten HK type names for display
+function shortType(t) {
+  return (t || "")
+    .replace("HKQuantityTypeIdentifier", "")
+    .replace("HKCategoryTypeIdentifier", "")
+    .replace("HKDataType", "");
+}
+
+// Shorten workout activity type
+function shortActivity(t) {
+  return (t || "").replace("HKWorkoutActivityType", "");
+}
+
+async function api(path) {
+  const res = await fetch(`${BASE}${path}`);
+  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  return res.json();
+}
+
+// ── Simple canvas line/area chart ──
+function drawLineChart(canvas, datasets, { yMin, yMax, yLabel, xLabels } = {}) {
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const pad = { top: 12, right: 14, bottom: 28, left: 42 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  // Compute y range
+  let allVals = datasets.flatMap(d => d.values.filter(v => v != null));
+  if (!allVals.length) {
+    ctx.fillStyle = "#766a5d";
+    ctx.font = "14px sans-serif";
+    ctx.fillText("暂无数据", W / 2 - 30, H / 2);
+    return;
+  }
+  const dataMin = Math.min(...allVals);
+  const dataMax = Math.max(...allVals);
+  const yLo = yMin != null ? yMin : dataMin - (dataMax - dataMin) * 0.1;
+  const yHi = yMax != null ? yMax : dataMax + (dataMax - dataMin) * 0.1;
+  const yRange = yHi - yLo || 1;
+
+  const n = datasets[0].values.length;
+  const xStep = n > 1 ? cw / (n - 1) : cw;
+
+  function toX(i) { return pad.left + i * xStep; }
+  function toY(v) { return pad.top + ch - ((v - yLo) / yRange) * ch; }
+
+  // Grid lines
+  ctx.strokeStyle = "rgba(118,106,93,0.1)";
+  ctx.lineWidth = 1;
+  const gridLines = 4;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.top + (ch / gridLines) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    const label = (yHi - (yRange / gridLines) * i).toFixed(yRange > 10 ? 0 : 1);
+    ctx.fillStyle = "#766a5d";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(label, pad.left - 6, y + 4);
+  }
+
+  // X labels
+  if (xLabels && xLabels.length) {
+    ctx.fillStyle = "#766a5d";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    const step = Math.max(1, Math.floor(n / 6));
+    for (let i = 0; i < n; i += step) {
+      ctx.fillText(xLabels[i], toX(i), H - 6);
     }
-
-    function shortDateTime(value) {
-      if (!value) return "-";
-      return String(value).replace("T", " ").slice(0, 16);
+    // Always show last
+    if ((n - 1) % step !== 0) {
+      ctx.fillText(xLabels[n - 1], toX(n - 1), H - 6);
     }
+  }
 
-    function humanMinutes(value) {
-      if (value == null || Number.isNaN(Number(value))) return "-";
-      const minutes = Number(value);
-      if (minutes < 1) return "<1 分钟";
-      if (minutes < 60) return `${minutes.toFixed(1)} 分钟`;
-      return `${(minutes / 60).toFixed(1)} 小时`;
-    }
-
-    function setEmptyTable(targetId, colspan, message) {
-      const target = document.getElementById(targetId);
-      target.innerHTML = `<tr><td colspan="${colspan}" class="empty">${message}</td></tr>`;
-    }
-
-    async function fetchJson(base, path) {
-      const res = await fetch(`${base}${path}`);
-      if (!res.ok) {
-        throw new Error(`${path} ${res.status}`);
+  // Draw each dataset
+  for (const ds of datasets) {
+    const vals = ds.values;
+    // Area fill
+    if (ds.fill) {
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < vals.length; i++) {
+        if (vals[i] == null) continue;
+        if (!started) { ctx.moveTo(toX(i), toY(vals[i])); started = true; }
+        else ctx.lineTo(toX(i), toY(vals[i]));
       }
-      return res.json();
+      // Close to bottom
+      for (let i = vals.length - 1; i >= 0; i--) {
+        if (vals[i] != null) { ctx.lineTo(toX(i), pad.top + ch); break; }
+      }
+      for (let i = 0; i < vals.length; i++) {
+        if (vals[i] != null) { ctx.lineTo(toX(i), pad.top + ch); break; }
+      }
+      ctx.closePath();
+      ctx.fillStyle = ds.fill;
+      ctx.fill();
     }
 
-    function renderStepsChart(items) {
-      const root = document.getElementById("stepsChart");
-      root.innerHTML = "";
-      if (!items.length) {
-        root.innerHTML = '<div class="empty">暂无步数数据</div>';
-        return;
-      }
-      const max = Math.max(...items.map(item => Number(item.steps || 0)), 1);
-      for (const item of items) {
-        const col = document.createElement("div");
-        col.className = "bar-col";
-        const height = Math.max(6, Math.round((Number(item.steps || 0) / max) * 180));
-        col.innerHTML = `
-          <div class="num">${fmtInt.format(Math.round(item.steps || 0))}</div>
-          <div class="bar" style="height:${height}px"></div>
-          <div class="day">${shortDate(item.date)}</div>
-        `;
-        root.appendChild(col);
-      }
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = ds.color || "#d35d47";
+    ctx.lineWidth = ds.width || 2;
+    let started = false;
+    for (let i = 0; i < vals.length; i++) {
+      if (vals[i] == null) { started = false; continue; }
+      if (!started) { ctx.moveTo(toX(i), toY(vals[i])); started = true; }
+      else ctx.lineTo(toX(i), toY(vals[i]));
+    }
+    ctx.stroke();
+  }
+}
+
+// ── Steps bar chart ──
+function renderStepsChart(items) {
+  const root = document.getElementById("stepsChart");
+  root.innerHTML = "";
+  if (!items.length) { root.innerHTML = '<div class="empty">暂无步数数据</div>'; return; }
+  const max = Math.max(...items.map(i => Number(i.steps || 0)), 1);
+  const days = ["日", "一", "二", "三", "四", "五", "六"];
+  for (const item of items) {
+    const col = document.createElement("div");
+    col.className = "bar-col";
+    const h = Math.max(6, Math.round((Number(item.steps || 0) / max) * 170));
+    const d = new Date(item.date);
+    const dayLabel = `${shortDate(item.date)} 周${days[d.getDay()]}`;
+    col.innerHTML = `
+      <div class="num">${fmtInt.format(Math.round(item.steps || 0))}</div>
+      <div class="bar" style="height:${h}px"></div>
+      <div class="day">${dayLabel}</div>
+    `;
+    root.appendChild(col);
+  }
+}
+
+// ── Render table rows ──
+function renderRows(id, rows, render, emptyCols) {
+  const el = document.getElementById(id);
+  if (!rows || !rows.length) {
+    el.innerHTML = `<tr><td colspan="${emptyCols || 4}" class="empty">暂无数据</td></tr>`;
+    return;
+  }
+  el.innerHTML = rows.map(r => `<tr>${render(r)}</tr>`).join("");
+}
+
+// ── Heart rate ──
+let hrDays = 30;
+async function loadHeartRate() {
+  const start = dateDaysAgo(hrDays);
+  const data = await api(`/api/heart-rate?granularity=daily&start=${start}`);
+  document.getElementById("hrSubtitle").textContent = `近 ${hrDays} 天每日平均 / 最低 / 最高`;
+  drawLineChart(document.getElementById("hrCanvas"), [
+    { values: data.map(d => d.min_bpm), color: "rgba(63,125,107,0.3)", width: 1, fill: "rgba(63,125,107,0.06)" },
+    { values: data.map(d => d.max_bpm), color: "rgba(211,93,71,0.3)", width: 1, fill: "rgba(211,93,71,0.06)" },
+    { values: data.map(d => d.avg_bpm), color: "#d35d47", width: 2.5 },
+  ], { xLabels: data.map(d => shortDate(d.date)) });
+}
+
+// ── Sleep ──
+let sleepDays = 30;
+async function loadSleep() {
+  const start = dateDaysAgo(sleepDays);
+  const data = await api(`/api/sleep/daily?start=${start}`);
+  document.getElementById("sleepSubtitle").textContent = `近 ${sleepDays} 天每日睡眠小时数`;
+  drawLineChart(document.getElementById("sleepCanvas"), [
+    { values: data.map(d => Number(d.total_hours)), color: "#4a7fc4", width: 2.5, fill: "rgba(74,127,196,0.1)" },
+  ], { yMin: 0, xLabels: data.map(d => shortDate(d.date)) });
+}
+
+// ── Range button binding ──
+function bindRange(containerId, loadFn, setDays) {
+  const btns = document.querySelectorAll(`#${containerId} button`);
+  btns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      btns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      setDays(Number(btn.dataset.days));
+      loadFn();
+    });
+  });
+}
+
+// ── Main load ──
+let loading = false;
+async function loadDashboard() {
+  if (loading) return;
+  loading = true;
+  document.getElementById("apiHint").textContent = `API: ${BASE}/api`;
+  const status = document.getElementById("backendStatus");
+  status.innerHTML = '<span class="dot"></span><span>正在加载…</span>';
+
+  try {
+    const [overview, types, workoutSummary, workouts, syncState] = await Promise.all([
+      api("/api/stats/overview"),
+      api("/api/records/types"),
+      api("/api/workouts/summary"),
+      api("/api/workouts?limit=10"),
+      api("/api/device-sync-state").catch(() => []),
+    ]);
+
+    // Hero description
+    const r = overview.records || {};
+    document.getElementById("heroDesc").textContent =
+      `数据覆盖 ${r.earliest_date || "?"} 至 ${r.latest_date || "?"}，共 ${fmtInt.format(r.total_records || 0)} 条健康记录、${fmtInt.format((overview.workouts || {}).total_workouts || 0)} 次运动。`;
+
+    // Metric cards
+    document.getElementById("totalRecords").textContent = fmtInt.format(r.total_records || 0);
+    document.getElementById("recordRange").textContent = `${r.earliest_date || "-"} ~ ${r.latest_date || "-"}`;
+
+    document.getElementById("typeCount").textContent = fmtInt.format(r.distinct_types || 0);
+
+    const w = overview.workouts || {};
+    document.getElementById("totalWorkouts").textContent = fmtInt.format(w.total_workouts || 0);
+    document.getElementById("workoutCalories").textContent =
+      w.total_calories ? `${fmtInt.format(Math.round(w.total_calories))} kcal` : "-";
+
+    document.getElementById("totalSteps").textContent = fmtInt.format(overview.total_steps || 0);
+    document.getElementById("sleepDays").textContent = `睡眠记录 ${fmtInt.format(overview.sleep_days || 0)} 天`;
+
+    // Steps chart
+    renderStepsChart(overview.recent_steps || []);
+
+    // Types table
+    renderRows("typesTable", (types || []).slice(0, 10), r => `
+      <td title="${r.type}">${shortType(r.type)}</td>
+      <td>${fmtInt.format(r.count || 0)}</td>
+      <td>${shortDate(r.first_date)} ~ ${shortDate(r.last_date)}</td>
+    `, 3);
+
+    // Workout summary table
+    renderRows("workoutTable", (workoutSummary || []).slice(0, 8), r => `
+      <td>${shortActivity(r.activity_type)}</td>
+      <td>${fmtInt.format(r.count || 0)}</td>
+      <td>${humanMinutes(r.total_minutes)}</td>
+      <td>${r.total_calories ? fmtInt.format(Math.round(r.total_calories)) : "-"}</td>
+    `, 4);
+
+    // Recent workouts table
+    renderRows("recentWorkoutTable", (workouts.data || []).slice(0, 10), r => `
+      <td>${r.date || shortDate(r.start_at)}</td>
+      <td>${shortActivity(r.activity_type)}</td>
+      <td>${humanMinutes(r.duration)}</td>
+      <td>${r.total_energy_burned ? Math.round(r.total_energy_burned) : "-"}</td>
+    `, 4);
+
+    // Sync info
+    const syncEl = document.getElementById("syncInfo");
+    if (Array.isArray(syncState) && syncState.length) {
+      syncEl.innerHTML = syncState.map(d => `
+        <div class="sync-row">
+          <span>${d.device_id || "?"}</span>
+          <span class="val">${d.last_sync_status || "-"} · ${shortDateTime(d.last_sync_at || d.last_seen_at)}</span>
+        </div>
+      `).join("");
+    } else {
+      syncEl.innerHTML = '<div class="sync-row"><span>暂无设备同步记录</span></div>';
     }
 
-    function renderRows(targetId, rows, render) {
-      const target = document.getElementById(targetId);
-      target.innerHTML = "";
-      if (!rows.length) {
-        target.innerHTML = '<tr><td colspan="4" class="empty">暂无数据</td></tr>';
-        return;
-      }
-      for (const row of rows) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = render(row);
-        target.appendChild(tr);
-      }
-    }
+    // Heart rate & sleep charts
+    await Promise.all([loadHeartRate(), loadSleep()]);
 
-    let loadingDashboard = false;
+    status.innerHTML = '<span class="dot"></span><span>API 已连接</span>';
+  } catch (err) {
+    status.innerHTML = `<span class="dot red"></span><span>${err.message}</span>`;
+  } finally {
+    loading = false;
+  }
+}
 
-    async function loadDashboard() {
-      if (loadingDashboard) return;
-      loadingDashboard = true;
-      const base = window.location.origin;
-      document.getElementById("apiHint").textContent = `API: ${base}/api`;
-      const status = document.getElementById("backendStatus");
-      status.innerHTML = '<span class="dot"></span><span>正在加载 API 数据</span>';
+// Bind range buttons
+bindRange("hrRange", loadHeartRate, d => { hrDays = d; });
+bindRange("sleepRange", loadSleep, d => { sleepDays = d; });
 
-      try {
-        const [importStatus, workouts] = await Promise.all([
-          fetchJson(base, "/api/import-status"),
-          fetchJson(base, "/api/workouts/summary"),
-        ]);
+document.getElementById("reloadBtn").addEventListener("click", loadDashboard);
 
-        const batch = importStatus.batch || {};
-        const files = importStatus.files || {};
-        const tables = importStatus.tables || {};
-        const batchStatus = batch.status || "idle";
-        const importing = batchStatus === "running";
-        const stalled = Boolean(files.stalled);
-        const recordProgress = files.record_progress_percent;
-        const totalEstimate = files.estimated_total_records;
-        const eta = files.eta_minutes;
-        const speedWindowMinutes = files.speed_window_minutes || 10;
-        const lastProgressAt = files.last_progress_at;
-        const estimatedCompletionAt = files.estimated_completion_at;
-        const xmlRecordsSeen = files.xml_records_seen ?? files.records_seen ?? 0;
+// Redraw charts on resize
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { loadHeartRate(); loadSleep(); }, 200);
+});
 
-        document.getElementById("importBatchMeta").textContent = batch.id
-          ? `#${batch.id} ${batch.batch_type || "-"} / ${batchStatus}`
-          : "暂无导入批次";
-        document.getElementById("importFileMeta").textContent = files.total
-          ? `${fmtInt.format(xmlRecordsSeen)} / ${fmtInt.format(totalEstimate || 0)} Record`
-          : "暂无文件记录";
-
-        document.getElementById("totalRecords").textContent = fmtInt.format(
-          files.records_inserted || tables.health_records_max_id || 0
-        );
-        document.getElementById("recordRange").textContent = importing
-          ? `已扫描 ${fmtInt.format(xmlRecordsSeen)} 条 / 预计 ${fmtInt.format(totalEstimate || 0)} 条`
-          : `表内最大 ID ${fmtInt.format(tables.health_records_max_id || 0)}`;
-
-        document.getElementById("totalWorkouts").textContent = recordProgress == null
-          ? "-"
-          : `${recordProgress}%`;
-        document.getElementById("workoutCalories").textContent = importing
-          ? `近 ${speedWindowMinutes} 分钟 ${fmtInt.format(Math.round(files.scan_rate_per_minute || 0))} 条/分钟 / 预计 ${estimatedCompletionAt ? shortDateTime(estimatedCompletionAt) : humanMinutes(eta)} 完成`
-          : "导入已结束";
-
-        document.getElementById("totalSteps").textContent = stalled ? "疑似卡住" : (tables.profile_ready ? "已就绪" : "未就绪");
-        document.getElementById("sleepDays").textContent = stalled
-          ? `最近进度 ${files.seconds_since_progress || 0} 秒前`
-          : `最近心跳 ${shortDateTime(lastProgressAt)} / Workout ${fmtInt.format(tables.workouts || 0)} / ECG ${fmtInt.format(tables.ecg_readings || 0)}`;
-
-        if (importing) {
-          document.getElementById("typeCount").textContent = fmtInt.format(files.records_inserted || 0);
-          document.getElementById("typeCountSub").textContent = "本轮新增写入记录";
-          renderStepsChart([]);
-          setEmptyTable("typesTable", 3, stalled ? "导入疑似卡住，请检查 importer 进程与 MySQL processlist" : "导入进行中，已暂停类型聚合查询");
-          setEmptyTable("sleepTable", 4, stalled ? "导入疑似卡住，请刷新或查看 /api/import-status" : "导入进行中，已暂停睡眠聚合查询");
-        } else {
-          const [overview, types, sleep] = await Promise.all([
-            fetchJson(base, "/api/stats/overview"),
-            fetchJson(base, "/api/records/types"),
-            fetchJson(base, "/api/sleep/daily"),
-          ]);
-
-          document.getElementById("typeCount").textContent = fmtInt.format(overview.records.distinct_types || 0);
-          document.getElementById("typeCountSub").textContent = "HealthKit 原始类型";
-          document.getElementById("recordRange").textContent = `${overview.records.earliest_date || "-"} 到 ${overview.records.latest_date || "-"}`;
-          document.getElementById("totalSteps").textContent = fmtInt.format(overview.total_steps || 0);
-          document.getElementById("sleepDays").textContent = `睡眠记录天数 ${fmtInt.format(overview.sleep_days || 0)}`;
-          renderStepsChart(overview.recent_steps || []);
-          renderRows("typesTable", (types || []).slice(0, 8), row => `
-            <td>${row.type}</td>
-            <td>${fmtInt.format(row.count || 0)}</td>
-            <td>${shortDate(row.first_date)} - ${shortDate(row.last_date)}</td>
-          `);
-          renderRows("sleepTable", (sleep || []).slice(-10).reverse(), row => `
-            <td>${row.date}</td>
-            <td>${Number(row.total_hours || 0).toFixed(2)} h</td>
-            <td>${shortDateTime(row.sleep_start)}</td>
-            <td>${shortDateTime(row.sleep_end)}</td>
-          `);
-        }
-
-        renderRows("workoutTable", (workouts || []).slice(0, 8), row => `
-          <td>${row.activity_type}</td>
-          <td>${fmtInt.format(row.count || 0)}</td>
-          <td>${fmtInt.format(Math.round(row.total_minutes || 0))}</td>
-        `);
-
-        status.innerHTML = stalled
-          ? `<span class="dot" style="background:#d35d47;box-shadow:0 0 0 6px rgba(211,93,71,.12)"></span><span>API 已连接 / 导入疑似卡住 / 最近心跳 ${shortDateTime(lastProgressAt)}</span>`
-          : `<span class="dot"></span><span>API 已连接 / 导入状态 ${batchStatus} / 进度 ${recordProgress == null ? "-" : `${recordProgress}%`}</span>`;
-      } catch (error) {
-        status.innerHTML = `<span class="dot" style="background:#d35d47;box-shadow:0 0 0 6px rgba(211,93,71,.12)"></span><span>${error.message}</span>`;
-      } finally {
-        loadingDashboard = false;
-      }
-    }
-
-    document.getElementById("reloadBtn").addEventListener("click", loadDashboard);
-    loadDashboard();
-    window.setInterval(loadDashboard, 15000);
-  </script>
+loadDashboard();
+</script>
 </body>
 </html>
