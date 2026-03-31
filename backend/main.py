@@ -711,20 +711,45 @@ def ingest_samples(payload: IngestPayload, authorization: str | None = Header(No
         try:
             rows = [health_record_row_from_ingest(payload, item) for item in payload.items]
             inserted_count = 0
+            business_deduped_count = 0
             if rows:
-                cur.executemany(
-                    """
-                    INSERT IGNORE INTO health_records (
-                        record_hash, type, source_name, source_version, device, unit,
-                        value_text, value_num, creation_at, start_at, end_at, local_date, metadata
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    rows,
+                # Business dedup: filter out records already present by content identity
+                # (type, start_at, end_at, source_name). This handles the case where the
+                # same HealthKit sample was previously imported via XML export and now arrives
+                # via Bridge — both paths produce different record_hash values, so INSERT IGNORE
+                # alone would create duplicates. We pre-filter those rows here.
+                check_keys = [(row[1], row[9], row[10], row[2]) for row in rows]
+                placeholders = ", ".join(["(%s, %s, %s, %s)"] * len(check_keys))
+                flat_params = [v for key in check_keys for v in key]
+                cur.execute(
+                    f"SELECT type, start_at, end_at, source_name FROM health_records "
+                    f"WHERE (type, start_at, end_at, source_name) IN ({placeholders})",
+                    flat_params,
                 )
-                inserted_count = max(cur.rowcount, 0)
+                existing_keys = {
+                    (r["type"], r["start_at"], r["end_at"], r["source_name"])
+                    for r in cur.fetchall()
+                }
+                filtered_rows = [
+                    row for row in rows
+                    if (row[1], row[9], row[10], row[2]) not in existing_keys
+                ]
+                business_deduped_count = len(rows) - len(filtered_rows)
 
-            deduplicated_count = accepted_count - inserted_count
+                if filtered_rows:
+                    cur.executemany(
+                        """
+                        INSERT IGNORE INTO health_records (
+                            record_hash, type, source_name, source_version, device, unit,
+                            value_text, value_num, creation_at, start_at, end_at, local_date, metadata
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        filtered_rows,
+                    )
+                    inserted_count = max(cur.rowcount, 0)
+
+            deduplicated_count = accepted_count - inserted_count - business_deduped_count
 
             upsert_device_sync_state(
                 cur,
