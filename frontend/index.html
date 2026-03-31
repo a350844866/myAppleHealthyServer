@@ -84,6 +84,8 @@
       margin-bottom: 18px;
     }
     .metric-card { padding: 18px; min-height: 110px; }
+    .metric-card.clickable { cursor: pointer; transition: background 0.15s, transform 0.1s; }
+    .metric-card.clickable:hover { background: rgba(63, 125, 107, 0.06); transform: translateY(-2px); }
     .metric-card .label { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
     .metric-card .value { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
     .metric-card .sub { color: var(--muted); font-size: 13px; margin-top: 8px; }
@@ -293,24 +295,24 @@
     </div>
   </section>
 
-  <!-- Metric cards (today) -->
+  <!-- Metric cards (today, clickable) -->
   <section class="metric-grid">
-    <div class="panel metric-card">
+    <div class="panel metric-card clickable" data-metric="steps">
       <div class="label">今日步数</div>
       <div id="todaySteps" class="value">-</div>
       <div id="todayStepsSub" class="sub">-</div>
     </div>
-    <div class="panel metric-card">
+    <div class="panel metric-card clickable" data-metric="hr">
       <div class="label">今日心率</div>
       <div id="todayHR" class="value">-</div>
       <div id="todayHRSub" class="sub">-</div>
     </div>
-    <div class="panel metric-card">
+    <div class="panel metric-card clickable" data-metric="cal">
       <div class="label">今日活动能量</div>
       <div id="todayCal" class="value">-</div>
       <div id="todayCalSub" class="sub">-</div>
     </div>
-    <div class="panel metric-card">
+    <div class="panel metric-card clickable" data-metric="sync">
       <div class="label">今日同步</div>
       <div id="todaySync" class="value">-</div>
       <div id="todaySyncSub" class="sub">-</div>
@@ -436,6 +438,11 @@
       <button data-days="90">90天</button>
       <button data-days="365">1年</button>
       <button data-days="0">全部</button>
+    </div>
+    <div class="date-range" id="modalHourlyDate" style="display:none">
+      <button id="modalDatePrev">‹ 前一天</button>
+      <span id="modalDateLabel" style="padding:0 14px;font-size:14px;color:var(--text)">今天</span>
+      <button id="modalDateNext" disabled>后一天 ›</button>
     </div>
     <div class="modal-stats" id="modalStats"></div>
     <div class="modal-chart">
@@ -632,6 +639,75 @@ function drawLineChart(canvas, datasets, { yMin, yMax, yLabel, xLabels } = {}) {
       else ctx.lineTo(toX(i), toY(vals[i]));
     }
     ctx.stroke();
+  }
+}
+
+// ── Hourly bar chart (24 slots) ──
+function drawBarChart(canvas, slots, { color } = {}) {
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  const pad = { top: 12, right: 14, bottom: 28, left: 46 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  if (slots.every(v => !v)) {
+    ctx.fillStyle = "#766a5d";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("当日暂无数据", W / 2, H / 2);
+    return;
+  }
+
+  const maxVal = Math.max(...slots, 1);
+  const gap = cw / 24;
+  const barW = gap * 0.65;
+
+  // Grid lines + y labels
+  ctx.strokeStyle = "rgba(118,106,93,0.1)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    const label = (maxVal * (1 - i / 4)).toFixed(maxVal > 10 ? 0 : 1);
+    ctx.fillStyle = "#766a5d";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(label, pad.left - 6, y + 4);
+  }
+
+  // X axis hour labels (every 3 hours)
+  ctx.fillStyle = "#766a5d";
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "center";
+  for (const h of [0, 3, 6, 9, 12, 15, 18, 21]) {
+    ctx.fillText(`${h}`, pad.left + h * gap + gap / 2, H - 6);
+  }
+
+  // Bars
+  const barColor = color || "#3f7d6b";
+  for (let h = 0; h < 24; h++) {
+    const v = slots[h] || 0;
+    if (v <= 0) continue;
+    const barH = (v / maxVal) * ch;
+    const x = pad.left + h * gap + (gap - barW) / 2;
+    const y = pad.top + ch - barH;
+    ctx.fillStyle = barColor;
+    ctx.globalAlpha = 0.75;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW, barH, [2, 2, 0, 0]);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, barW, barH);
+    }
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -852,10 +928,19 @@ function unitLabel(unit) {
   return map[unit] || unit || "";
 }
 
+const METRIC_MAP = {
+  steps: { type: "HKQuantityTypeIdentifierStepCount",        agg: "sum", title: "今日步数",   color: "#3f7d6b" },
+  hr:    { type: "HKQuantityTypeIdentifierHeartRate",         agg: "avg", title: "今日心率",   color: "#d35d47" },
+  cal:   { type: "HKQuantityTypeIdentifierActiveEnergyBurned", agg: "sum", title: "活动能量", color: "#4a7fc4" },
+};
+
 const modal = document.getElementById("typeModal");
 const modalCanvas = document.getElementById("modalCanvas");
 let currentModalType = null;
 let modalDays = 30;
+let modalMode = "daily";         // "daily" | "hourly" | "sync"
+let currentHourlyMetric = null;
+let currentHourlyDate = "";
 
 document.getElementById("modalClose").addEventListener("click", closeModal);
 modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
@@ -864,9 +949,18 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
 function closeModal() {
   modal.classList.remove("open");
   currentModalType = null;
+  currentHourlyMetric = null;
+  modalMode = "daily";
+  document.getElementById("modalRange").style.display = "";
+  document.getElementById("modalHourlyDate").style.display = "none";
 }
 
 async function openTypeDetail(rawType) {
+  modalMode = "daily";
+  currentHourlyMetric = null;
+  document.getElementById("modalRange").style.display = "";
+  document.getElementById("modalHourlyDate").style.display = "none";
+
   currentModalType = rawType;
   modalDays = 30;
   document.getElementById("modalTitle").textContent = shortType(rawType);
@@ -922,6 +1016,95 @@ async function loadModalData(rawType, days) {
   });
 }
 
+// ── Metric card hourly detail ──
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+async function openMetricDetail(metric) {
+  if (metric === "sync") { openSyncDetail(); return; }
+  const cfg = METRIC_MAP[metric];
+  if (!cfg) return;
+
+  modalMode = "hourly";
+  currentModalType = null;
+  currentHourlyMetric = metric;
+  currentHourlyDate = todayStr();
+
+  document.getElementById("modalTitle").textContent = cfg.title;
+  document.getElementById("modalSub").textContent = "每小时分布";
+  document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">加载中…</div></div>';
+  document.getElementById("modalRange").style.display = "none";
+  document.getElementById("modalHourlyDate").style.display = "";
+  document.getElementById("modalDateLabel").textContent = "今天";
+  document.getElementById("modalDateNext").disabled = true;
+
+  modal.classList.add("open");
+  await loadMetricHourly(metric, currentHourlyDate);
+}
+
+async function loadMetricHourly(metric, date) {
+  const cfg = METRIC_MAP[metric];
+  if (!cfg) return;
+  try {
+    const data = await api(`/api/records/hourly?type=${encodeURIComponent(cfg.type)}&agg=${cfg.agg}&date=${date}`);
+    const slots = Array(24).fill(0);
+    for (const d of data) { slots[d.hour] = d.value || 0; }
+    const totalCount = data.reduce((s, d) => s + (d.count || 0), 0);
+    const unit = data.length ? unitLabel(data[0].unit) : "";
+    const nonZero = slots.filter(v => v > 0);
+    let statsHTML = "";
+    if (nonZero.length) {
+      const total = cfg.agg === "sum" ? slots.reduce((a, b) => a + b, 0) : null;
+      const avg = nonZero.reduce((a, b) => a + b, 0) / nonZero.length;
+      const max = Math.max(...nonZero);
+      const peakHour = slots.indexOf(max);
+      statsHTML = `
+        ${total != null ? `<div class="modal-stat"><div class="label">全天合计</div><div class="val">${fmtNum(total)} <small>${unit}</small></div></div>` : ""}
+        <div class="modal-stat"><div class="label">${cfg.agg === "sum" ? "小时均值" : "全天均值"}</div><div class="val">${fmtNum(avg)} <small>${unit}</small></div></div>
+        <div class="modal-stat"><div class="label">峰值</div><div class="val">${fmtNum(max)} <small>${unit}</small></div></div>
+        <div class="modal-stat"><div class="label">峰值时段</div><div class="val">${peakHour}:00</div></div>
+        <div class="modal-stat"><div class="label">记录条数</div><div class="val">${fmtInt.format(totalCount)}</div></div>
+      `;
+    } else {
+      statsHTML = '<div class="modal-stat"><div class="label">当日暂无数据</div></div>';
+    }
+    document.getElementById("modalStats").innerHTML = statsHTML;
+    drawBarChart(modalCanvas, slots, { color: cfg.color });
+  } catch (err) {
+    document.getElementById("modalStats").innerHTML = `<div class="modal-stat"><div class="label">加载失败: ${err.message}</div></div>`;
+  }
+}
+
+async function openSyncDetail() {
+  modalMode = "sync";
+  currentModalType = null;
+  currentHourlyMetric = null;
+  document.getElementById("modalTitle").textContent = "今日同步详情";
+  document.getElementById("modalSub").textContent = "来自设备的同步事件";
+  document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">加载中…</div></div>';
+  document.getElementById("modalRange").style.display = "none";
+  document.getElementById("modalHourlyDate").style.display = "none";
+  modal.classList.add("open");
+  try {
+    const today = await api("/api/stats/today");
+    document.getElementById("modalStats").innerHTML = `
+      <div class="modal-stat"><div class="label">今日同步次数</div><div class="val">${today.today_sync_count || 0}</div></div>
+      <div class="modal-stat"><div class="label">今日接受记录</div><div class="val">${fmtInt.format(today.today_sync_accepted || 0)} 条</div></div>
+      <div class="modal-stat"><div class="label">今日健康记录</div><div class="val">${fmtInt.format(today.today_records || 0)} 条</div></div>
+      <div class="modal-stat"><div class="label">今日记录类型</div><div class="val">${today.today_types || 0} 种</div></div>
+      <div class="modal-stat"><div class="label">今日最后同步</div><div class="val">${shortDateTime(today.today_last_sync_at) || "-"}</div></div>
+      <div class="modal-stat"><div class="label">历史最后同步</div><div class="val">${shortDateTime(today.last_sync_at) || "-"}</div></div>
+    `;
+    const ctx = modalCanvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = modalCanvas.parentElement.getBoundingClientRect();
+    modalCanvas.width = rect.width * dpr;
+    modalCanvas.height = rect.height * dpr;
+    ctx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
+  } catch (err) {
+    document.getElementById("modalStats").innerHTML = `<div class="modal-stat"><div class="label">加载失败: ${err.message}</div></div>`;
+  }
+}
+
 function fmtNum(v) {
   if (v == null) return "-";
   if (Math.abs(v) >= 1000) return fmtInt.format(Math.round(v));
@@ -929,14 +1112,43 @@ function fmtNum(v) {
   return v.toFixed(2);
 }
 
-// Modal range buttons
+// Modal range buttons (daily mode only)
 document.querySelectorAll("#modalRange button").forEach(btn => {
   btn.addEventListener("click", () => {
+    if (modalMode !== "daily") return;
     document.querySelectorAll("#modalRange button").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     modalDays = Number(btn.dataset.days);
     if (currentModalType) loadModalData(currentModalType, modalDays);
   });
+});
+
+// Hourly mode date navigation
+document.getElementById("modalDatePrev").addEventListener("click", () => {
+  const d = new Date(currentHourlyDate + "T12:00:00");
+  d.setDate(d.getDate() - 1);
+  currentHourlyDate = d.toISOString().slice(0, 10);
+  const isToday = currentHourlyDate >= todayStr();
+  document.getElementById("modalDateLabel").textContent = isToday ? "今天" : currentHourlyDate;
+  document.getElementById("modalDateNext").disabled = isToday;
+  if (currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate);
+});
+
+document.getElementById("modalDateNext").addEventListener("click", () => {
+  const today = todayStr();
+  if (currentHourlyDate >= today) return;
+  const d = new Date(currentHourlyDate + "T12:00:00");
+  d.setDate(d.getDate() + 1);
+  currentHourlyDate = d.toISOString().slice(0, 10);
+  const isToday = currentHourlyDate >= today;
+  document.getElementById("modalDateLabel").textContent = isToday ? "今天" : currentHourlyDate;
+  document.getElementById("modalDateNext").disabled = isToday;
+  if (currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate);
+});
+
+// Metric card clicks
+document.querySelectorAll(".metric-card.clickable").forEach(card => {
+  card.addEventListener("click", () => openMetricDetail(card.dataset.metric));
 });
 
 // Redraw charts on resize
@@ -946,7 +1158,8 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(() => {
     loadHeartRate();
     loadSleep();
-    if (currentModalType) loadModalData(currentModalType, modalDays);
+    if (modalMode === "hourly" && currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate);
+    else if (currentModalType) loadModalData(currentModalType, modalDays);
   }, 200);
 });
 

@@ -1059,6 +1059,38 @@ def get_daily_records(
         return rows_to_list(cur.fetchall())
 
 
+@app.get("/api/records/hourly")
+def get_hourly_records(
+    type: str = Query(...),
+    date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today"),
+    agg: Literal["sum", "avg", "max", "min", "count"] = Query("sum"),
+):
+    agg_sql = {
+        "sum": "SUM(value_num)",
+        "avg": "AVG(value_num)",
+        "max": "MAX(value_num)",
+        "min": "MIN(value_num)",
+        "count": "COUNT(*)",
+    }[agg]
+    target_date = date or "CURDATE()"
+    date_filter = "local_date = CURDATE()" if not date else "local_date = %s"
+    conditions = ["type = %s", "value_num IS NOT NULL", date_filter]
+    params: list = [type] + ([date] if date else [])
+
+    with get_db() as db, db.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT HOUR(start_at) AS hour, {agg_sql} AS value, COUNT(*) AS count, MIN(unit) AS unit
+            FROM health_records
+            WHERE {" AND ".join(conditions)}
+            GROUP BY HOUR(start_at)
+            ORDER BY hour
+            """,
+            params,
+        )
+        return rows_to_list(cur.fetchall())
+
+
 @app.get("/api/steps")
 def get_steps(start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
     return get_daily_records("HKQuantityTypeIdentifierStepCount", start, end, "sum")
