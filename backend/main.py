@@ -843,6 +843,53 @@ def get_device_sync_state():
     }
 
 
+@app.get("/api/device-sync-state/anchors")
+def get_device_sync_anchors(
+    device_id: str = Query(...),
+    bundle_id: Optional[str] = Query(None),
+):
+    with get_db() as db, db.cursor() as cur:
+        ensure_ingest_tables(cur)
+        cur.execute(
+            """
+            SELECT device_id, bundle_id, last_seen_at, last_sent_at, last_sync_at, last_sync_status,
+                   last_error_message, last_items_count, last_accepted_count, last_deduplicated_count, updated_at
+            FROM device_sync_state
+            WHERE device_id = %s
+            """,
+            (device_id,),
+        )
+        device = cur.fetchone()
+        if not device:
+            raise HTTPException(404, "未找到该 device_id 的同步状态")
+
+        if bundle_id and device["bundle_id"] != bundle_id:
+            raise HTTPException(404, "device_id 存在，但 bundle_id 不匹配")
+
+        cur.execute(
+            """
+            SELECT record_type, anchor_value, updated_at
+            FROM device_sync_anchors
+            WHERE device_id = %s
+            ORDER BY record_type
+            """,
+            (device_id,),
+        )
+        anchor_rows = rows_to_list(cur.fetchall())
+
+    anchors = {row["record_type"]: row["anchor_value"] for row in anchor_rows}
+    anchors_updated_at = max((row["updated_at"] for row in anchor_rows), default=None)
+    device_payload = dict(device)
+    device_payload["anchor_count"] = len(anchor_rows)
+    device_payload["anchors_updated_at"] = anchors_updated_at
+
+    return {
+        "device": device_payload,
+        "anchors": anchors,
+        "anchor_records": anchor_rows,
+    }
+
+
 @app.get("/api/records/types")
 def list_record_types():
     with get_db() as db, db.cursor() as cur:

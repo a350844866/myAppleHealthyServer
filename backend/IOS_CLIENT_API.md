@@ -8,6 +8,7 @@
 
 - `POST /ingest`
 - `GET /api/device-sync-state`
+- `GET /api/device-sync-state/anchors`
 
 当前还没有落地的能力：
 
@@ -198,7 +199,7 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 2. 样本去重后写入 `health_records`
 3. 同步状态与 anchors 写入 `device_sync_state`、`device_sync_anchors`
 
-这意味着客户端可以把 `/api/device-sync-state` 当成联调排查入口。
+这意味着客户端可以把 `/api/device-sync-state` 当成联调排查入口，把 `/api/device-sync-state/anchors` 当成服务端游标恢复入口。
 
 ## GET /api/device-sync-state
 
@@ -251,11 +252,84 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 - `devices[].last_error_message`
 - `recent_events[0]`
 
+## GET /api/device-sync-state/anchors
+
+用于让 iOS 客户端按 `device_id` 读取服务端保存的 anchor map，在本地 anchor 丢失时恢复增量同步位置。
+
+### 查询参数
+
+- `device_id` 必填
+- `bundle_id` 选填
+  - 如果传了，就会额外校验该 `device_id` 当前登记的 bundle id 是否匹配
+
+### 请求示例
+
+```text
+GET /api/device-sync-state/anchors?device_id=iphone-15-pro-max&bundle_id=com.example.myAppleHealthyBridge
+```
+
+### 响应示例
+
+```json
+{
+  "device": {
+    "device_id": "iphone-15-pro-max",
+    "bundle_id": "com.example.myAppleHealthyBridge",
+    "last_seen_at": "2026-03-31T16:31:00",
+    "last_sent_at": "2026-03-31T16:30:58",
+    "last_sync_at": "2026-03-31T16:31:00",
+    "last_sync_status": "completed",
+    "last_error_message": null,
+    "last_items_count": 120,
+    "last_accepted_count": 120,
+    "last_deduplicated_count": 30,
+    "updated_at": "2026-03-31T16:31:00",
+    "anchor_count": 4,
+    "anchors_updated_at": "2026-03-31T16:31:00"
+  },
+  "anchors": {
+    "HKQuantityTypeIdentifierHeartRate": "base64-anchor",
+    "HKCategoryTypeIdentifierSleepAnalysis": "base64-anchor"
+  },
+  "anchor_records": [
+    {
+      "record_type": "HKCategoryTypeIdentifierSleepAnalysis",
+      "anchor_value": "base64-anchor",
+      "updated_at": "2026-03-31T16:31:00"
+    },
+    {
+      "record_type": "HKQuantityTypeIdentifierHeartRate",
+      "anchor_value": "base64-anchor",
+      "updated_at": "2026-03-31T16:31:00"
+    }
+  ]
+}
+```
+
+### 失败响应
+
+`404 Not Found`
+
+```json
+{
+  "detail": "未找到该 device_id 的同步状态"
+}
+```
+
+或：
+
+```json
+{
+  "detail": "device_id 存在，但 bundle_id 不匹配"
+}
+```
+
 ## 客户端实现建议
 
 - base URL 只保存根地址
 - token 允许为空
 - 每种类型单独维护 anchor
+- 本地 anchor 缺失时，优先尝试读取 `/api/device-sync-state/anchors`
 - payload 做成可重试、可重放
 - 不要因为服务端已经幂等，就放弃本地去重和错误重试控制
 
