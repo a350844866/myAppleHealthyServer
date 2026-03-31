@@ -9,6 +9,7 @@
 - `POST /ingest`
 - `GET /api/device-sync-state`
 - `GET /api/device-sync-state/anchors`
+- `GET /api/records/recent`
 
 当前还没有落地的能力：
 
@@ -200,6 +201,67 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 3. 同步状态与 anchors 写入 `device_sync_state`、`device_sync_anchors`
 
 这意味着客户端可以把 `/api/device-sync-state` 当成联调排查入口，把 `/api/device-sync-state/anchors` 当成服务端游标恢复入口。
+
+## GET /api/records/recent
+
+用于按 `device_id` 查看最近落库的原始 `health_records` 明细，方便排查“客户端到底传上来了哪些样本”。
+
+### 查询参数
+
+- `device_id` 必填
+- `bundle_id` 选填
+- `type` 选填
+- `start` 选填，按 `local_date` 过滤，格式 `YYYY-MM-DD`
+- `end` 选填，按 `local_date` 过滤，格式 `YYYY-MM-DD`
+- `limit` 选填，默认 `100`，最大 `1000`
+- `offset` 选填，默认 `0`
+
+### 请求示例
+
+```text
+GET /api/records/recent?device_id=jiaxu-iphone&limit=20
+```
+
+或：
+
+```text
+GET /api/records/recent?device_id=jiaxu-iphone&type=HKQuantityTypeIdentifierHeartRate&start=2026-03-24&end=2026-03-31&limit=50
+```
+
+### 响应示例
+
+```json
+{
+  "total": 2,
+  "data": [
+    {
+      "id": 123456,
+      "type": "HKQuantityTypeIdentifierHeartRate",
+      "source_name": "Apple Watch",
+      "source_version": "11.4",
+      "unit": "count/min",
+      "value_text": "72",
+      "value_num": 72,
+      "start_at": "2026-03-31T08:28:00",
+      "end_at": "2026-03-31T08:28:00",
+      "local_date": "2026-03-31",
+      "metadata": {
+        "bridge_bundle_id": "com.example.myAppleHealthyBridge",
+        "bridge_device_id": "jiaxu-iphone",
+        "bridge_kind": "sample",
+        "bridge_sent_at": "2026-03-31T08:30:00+08:00",
+        "bridge_source": "healthkit",
+        "source_name": "Apple Watch"
+      },
+      "bridge_device_id": "jiaxu-iphone",
+      "bridge_bundle_id": "com.example.myAppleHealthyBridge",
+      "bridge_sent_at": "2026-03-31T08:30:00+08:00",
+      "bridge_kind": "sample",
+      "bridge_source": "healthkit"
+    }
+  ]
+}
+```
 
 ## GET /api/device-sync-state
 

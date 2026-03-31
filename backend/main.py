@@ -904,6 +904,63 @@ def list_record_types():
         return rows_to_list(cur.fetchall())
 
 
+@app.get("/api/records/recent")
+def get_recent_records(
+    device_id: str = Query(...),
+    bundle_id: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    start: Optional[str] = Query(None),
+    end: Optional[str] = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0),
+):
+    conditions = ["JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_device_id')) = %s"]
+    params: list = [device_id]
+    if bundle_id:
+        conditions.append("JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_bundle_id')) = %s")
+        params.append(bundle_id)
+    if type:
+        conditions.append("type = %s")
+        params.append(type)
+
+    date_conditions, date_params = build_date_filters("local_date", start, end)
+    conditions.extend(date_conditions)
+    params.extend(date_params)
+
+    where = " AND ".join(conditions)
+    with get_db() as db, db.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT
+                id,
+                type,
+                source_name,
+                source_version,
+                unit,
+                value_text,
+                value_num,
+                start_at,
+                end_at,
+                local_date,
+                metadata,
+                JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_device_id')) AS bridge_device_id,
+                JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_bundle_id')) AS bridge_bundle_id,
+                JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_sent_at')) AS bridge_sent_at,
+                JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_kind')) AS bridge_kind,
+                JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.bridge_source')) AS bridge_source
+            FROM health_records
+            WHERE {where}
+            ORDER BY start_at DESC, id DESC
+            LIMIT %s OFFSET %s
+            """,
+            params + [limit, offset],
+        )
+        rows = cur.fetchall()
+        cur.execute(f"SELECT COUNT(*) AS total FROM health_records WHERE {where}", params)
+        total = cur.fetchone()["total"]
+    return {"total": total, "data": rows_to_list(rows)}
+
+
 @app.get("/api/records")
 def get_records(
     type: str = Query(...),
