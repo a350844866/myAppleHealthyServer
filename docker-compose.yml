@@ -9,6 +9,8 @@ services:
       - "18000:18000"
     volumes:
       - ./apple_health_export:/app/apple_health_export:ro
+      - ./frontend:/app/frontend:ro
+      - ./backend:/app/backend:ro
     environment:
       HEALTH_DB_HOST: ${HEALTH_DB_HOST:-host.docker.internal}
       HEALTH_DB_PORT: ${HEALTH_DB_PORT:-3306}
