@@ -7,7 +7,7 @@ from backend.cache import dashboard_home_cache
 from backend.config import LOCAL_TIMEZONE
 from backend.database import get_db
 from backend.queries.heart_rate import query_daily_heart_rate_rows
-from backend.queries.sleep import query_sleep_daily_rows
+from backend.queries.sleep import query_sleep_daily_rows, query_sleep_stage_rows
 from backend.services.ai_service import get_ai_config
 from backend.services.sync_service import prioritize_devices
 from backend.utils import as_int, mean, percent_change, round_or_none, rows_to_list
@@ -233,29 +233,7 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
         )
         devices = prioritize_devices(rows_to_list(cur.fetchall()))
 
-        cur.execute(
-            """
-            SELECT local_date AS date,
-                   value_text AS stage,
-                   ROUND(SUM(TIMESTAMPDIFF(SECOND, start_at, end_at)) / 60.0, 1) AS minutes
-            FROM health_records
-            WHERE type=%s
-              AND local_date >= %s
-              AND value_text IN (%s, %s, %s, %s, %s)
-            GROUP BY local_date, value_text
-            ORDER BY local_date, value_text
-            """,
-            (
-                "HKCategoryTypeIdentifierSleepAnalysis",
-                fourteen_days_ago,
-                "HKCategoryValueSleepAnalysisAsleepCore",
-                "HKCategoryValueSleepAnalysisAsleepDeep",
-                "HKCategoryValueSleepAnalysisAsleepREM",
-                "HKCategoryValueSleepAnalysisAsleepUnspecified",
-                "HKCategoryValueSleepAnalysisAwake",
-            ),
-        )
-        sleep_stage_rows = rows_to_list(cur.fetchall())
+        sleep_stage_rows = query_sleep_stage_rows(cur, start=fourteen_days_ago)
 
     step_map = {row["date"].isoformat(): as_int(row.get("steps")) for row in step_rows}
     steps_last_14_days = []
