@@ -20,6 +20,12 @@ services:
       HEALTH_LOCAL_TZ: ${HEALTH_LOCAL_TZ:-Asia/Shanghai}
       INGEST_API_TOKEN: ${INGEST_API_TOKEN:-}
       IMPORT_STALE_SECONDS: ${IMPORT_STALE_SECONDS:-300}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.6}
+      OPENROUTER_ALLOWED_MODELS: ${OPENROUTER_ALLOWED_MODELS:-anthropic/claude-sonnet-4.6,minimax/minimax-m2.7}
+      OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-myAppleHealthy}
+      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
+      AI_ANALYSIS_CACHE_TTL_SECONDS: ${AI_ANALYSIS_CACHE_TTL_SECONDS:-900}
     extra_hosts:
       - "host.docker.internal:host-gateway"
   importer:

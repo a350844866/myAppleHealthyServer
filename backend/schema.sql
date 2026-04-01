@@ -235,3 +235,20 @@ CREATE TABLE IF NOT EXISTS device_sync_anchors (
     PRIMARY KEY (device_id, record_type),
     CONSTRAINT fk_device_sync_anchors_state FOREIGN KEY (device_id) REFERENCES device_sync_state(device_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS ai_dashboard_reports (
+    id                BIGINT PRIMARY KEY AUTO_INCREMENT,
+    snapshot_hash     CHAR(64) NOT NULL,
+    model             VARCHAR(128) NOT NULL,
+    title             VARCHAR(255) NOT NULL,
+    summary           TEXT NOT NULL,
+    bullets_json      JSON NOT NULL,
+    watchouts_json    JSON NOT NULL,
+    next_focus_json   JSON NOT NULL,
+    confidence        VARCHAR(64) NULL,
+    usage_json        JSON NULL,
+    snapshot_json     JSON NOT NULL,
+    generated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_ai_reports_generated (generated_at),
+    KEY idx_ai_reports_snapshot_model_time (snapshot_hash, model, generated_at)
+);

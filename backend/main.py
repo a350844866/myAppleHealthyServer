@@ -11,8 +11,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
+import time
+import urllib.error
+import urllib.request
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -35,6 +39,21 @@ IMPORT_STALE_SECONDS = int(os.getenv("IMPORT_STALE_SECONDS", "300"))
 IMPORT_RATE_WINDOW_MINUTES = int(os.getenv("IMPORT_RATE_WINDOW_MINUTES", "10"))
 XML_PATH = BASE_DIR / "apple_health_export" / "导出.xml"
 _xml_record_total_cache: int | None = None
+_dashboard_ai_cache: dict[str, dict[str, Any]] = {}
+OPENROUTER_API_URL = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
+OPENROUTER_ALLOWED_MODELS = tuple(
+    model.strip()
+    for model in os.getenv(
+        "OPENROUTER_ALLOWED_MODELS",
+        "anthropic/claude-sonnet-4.6,minimax/minimax-m2.7",
+    ).split(",")
+    if model.strip()
+)
+OPENROUTER_DEFAULT_MODEL = os.getenv(
+    "OPENROUTER_MODEL",
+    OPENROUTER_ALLOWED_MODELS[0] if OPENROUTER_ALLOWED_MODELS else "anthropic/claude-sonnet-4.6",
+)
+AI_ANALYSIS_CACHE_TTL_SECONDS = int(os.getenv("AI_ANALYSIS_CACHE_TTL_SECONDS", "900"))
 INGEST_TABLE_STATEMENTS = [
     """
     CREATE TABLE IF NOT EXISTS ingest_events (
@@ -125,6 +144,244 @@ def row_to_dict(row) -> dict | None:
     return dict(row) if row else None
 
 
+def round_or_none(value: Any, digits: int = 1) -> float | None:
+    if value is None:
+        return None
+    return round(float(value), digits)
+
+
+def as_int(value: Any) -> int:
+    return int(value or 0)
+
+
+def percent_change(current: float | int | None, previous: float | int | None, digits: int = 1) -> float | None:
+    if current is None or previous in (None, 0):
+        return None
+    return round(((float(current) - float(previous)) / float(previous)) * 100, digits)
+
+
+def mean(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def get_ai_config() -> dict[str, Any]:
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    allowed_models = list(OPENROUTER_ALLOWED_MODELS)
+    default_model = OPENROUTER_DEFAULT_MODEL if OPENROUTER_DEFAULT_MODEL in allowed_models else (
+        allowed_models[0] if allowed_models else None
+    )
+    return {
+        "available": bool(api_key and default_model),
+        "default_model": default_model,
+        "models": allowed_models,
+        "provider": "openrouter",
+    }
+
+
+def resolve_ai_model(model: str | None) -> str:
+    config = get_ai_config()
+    if not config["available"]:
+        raise HTTPException(503, "AI 分析未配置 OPENROUTER_API_KEY 或默认模型")
+    selected = (model or config["default_model"] or "").strip()
+    if selected not in config["models"]:
+        raise HTTPException(400, f"不允许的模型: {selected or '-'}")
+    return selected
+
+
+def parse_json_object(text: str) -> dict[str, Any]:
+    text = text.strip()
+    if not text:
+        raise ValueError("empty response")
+    try:
+        payload = json.loads(text)
+        if isinstance(payload, dict):
+            return payload
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{.*\}", text, flags=re.S)
+    if not match:
+        raise ValueError("response is not json object")
+    payload = json.loads(match.group(0))
+    if not isinstance(payload, dict):
+        raise ValueError("json payload is not object")
+    return payload
+
+
+def normalize_message_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+        return "\n".join(part for part in parts if part).strip()
+    return ""
+
+
+def build_ai_dashboard_prompt(home: dict[str, Any]) -> str:
+    compact_context = {
+        "generated_at": str(home.get("generated_at")),
+        "today": home.get("today"),
+        "steps": home.get("steps"),
+        "sleep": home.get("sleep"),
+        "heart_rate": home.get("heart_rate"),
+        "workouts": home.get("workouts"),
+        "recent_types": home.get("recent_types"),
+        "sync": home.get("sync"),
+        "heuristic_insights": home.get("insights"),
+    }
+    return (
+        "你是一个中文健康数据分析助手。"
+        "下面是个人 Apple Health 首页最近数据，不要做医疗诊断，不要夸张，不要输出空话。"
+        "请只基于给定数据做首页级总结，强调近期变化、数据新鲜度、值得继续观察的维度。"
+        "如果数据不足，要明确指出。\n\n"
+        "输出必须是 JSON 对象，字段固定为："
+        "title(string), summary(string), bullets(array of 3 short strings), "
+        "watchouts(array of 0-3 short strings), next_focus(array of 2 short strings), confidence(string)。"
+        "不要输出 markdown，不要输出代码块，不要输出 JSON 之外的内容。\n\n"
+        f"数据上下文:\n{json.dumps(compact_context, ensure_ascii=False, default=str)}"
+    )
+
+
+def request_openrouter_analysis(prompt: str, model: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(503, "缺少 OPENROUTER_API_KEY")
+
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a concise health dashboard analyst. Return valid JSON only.",
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        "temperature": 0.3,
+        "max_tokens": 500,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    site_url = os.getenv("OPENROUTER_SITE_URL", "").strip()
+    app_name = os.getenv("OPENROUTER_APP_NAME", "myAppleHealthy").strip()
+    if site_url:
+        headers["HTTP-Referer"] = site_url
+    if app_name:
+        headers["X-Title"] = app_name
+
+    last_payload: dict[str, Any] | None = None
+    for attempt in range(2):
+        req = urllib.request.Request(
+            OPENROUTER_API_URL,
+            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            raise HTTPException(502, f"OpenRouter 请求失败: HTTP {exc.code} {detail[:300]}") from exc
+        except urllib.error.URLError as exc:
+            raise HTTPException(502, f"OpenRouter 网络请求失败: {exc.reason}") from exc
+
+        last_payload = payload
+        message = ((payload.get("choices") or [{}])[0] or {}).get("message") or {}
+        content = normalize_message_content(message.get("content"))
+        if content:
+            try:
+                parsed = parse_json_object(content)
+                usage = payload.get("usage") or {}
+                return parsed, {
+                    "prompt_tokens": usage.get("prompt_tokens"),
+                    "completion_tokens": usage.get("completion_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                }
+            except (ValueError, json.JSONDecodeError):
+                pass
+        body["messages"][-1]["content"] = (
+            prompt
+            + "\n\n再次强调：请把一个合法 JSON 对象直接放在 assistant message.content 中，不要加解释，不要加代码块，不要只放 reasoning。"
+        )
+
+    preview = ""
+    if last_payload:
+        preview = json.dumps(last_payload.get("choices", [])[:1], ensure_ascii=False)[:600]
+    raise HTTPException(502, f"OpenRouter 返回内容为空或无法解析，预览: {preview}")
+
+
+def build_ai_cache_key(model: str, home: dict[str, Any]) -> str:
+    snapshot = {
+        "model": model,
+        "home": home,
+    }
+    encoded = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def normalize_string_list(value: Any, *, limit: int = 3) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    normalized = [str(item).strip() for item in value if str(item).strip()]
+    return normalized[:limit]
+
+
+def normalize_ai_analysis(analysis: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title": str(analysis.get("title") or "AI 近期分析").strip()[:255],
+        "summary": str(analysis.get("summary") or "").strip(),
+        "bullets": normalize_string_list(analysis.get("bullets"), limit=3),
+        "watchouts": normalize_string_list(analysis.get("watchouts"), limit=3),
+        "next_focus": normalize_string_list(analysis.get("next_focus"), limit=3),
+        "confidence": str(analysis.get("confidence") or "").strip()[:64],
+    }
+
+
+def deserialize_json_field(value: Any, fallback: Any) -> Any:
+    if value in (None, ""):
+        return fallback
+    if isinstance(value, (list, dict)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return fallback
+    return fallback
+
+
+def row_to_ai_report(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": int(row["id"]),
+        "snapshot_hash": row.get("snapshot_hash"),
+        "model": row.get("model"),
+        "generated_at": row.get("generated_at"),
+        "analysis": {
+            "title": row.get("title") or "",
+            "summary": row.get("summary") or "",
+            "bullets": deserialize_json_field(row.get("bullets_json"), []),
+            "watchouts": deserialize_json_field(row.get("watchouts_json"), []),
+            "next_focus": deserialize_json_field(row.get("next_focus_json"), []),
+            "confidence": row.get("confidence") or "",
+        },
+        "usage": deserialize_json_field(row.get("usage_json"), {}),
+    }
+
+
 def build_date_filters(column: str, start: Optional[str], end: Optional[str]) -> tuple[list[str], list]:
     conditions = []
     params: list = []
@@ -176,6 +433,93 @@ def ensure_import_status_schema(cur) -> None:
         )
         """
     )
+
+
+def ensure_dashboard_ai_schema(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ai_dashboard_reports (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            snapshot_hash CHAR(64) NOT NULL,
+            model VARCHAR(128) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            summary TEXT NOT NULL,
+            bullets_json JSON NOT NULL,
+            watchouts_json JSON NOT NULL,
+            next_focus_json JSON NOT NULL,
+            confidence VARCHAR(64) NULL,
+            usage_json JSON NULL,
+            snapshot_json JSON NOT NULL,
+            generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_ai_reports_generated (generated_at),
+            KEY idx_ai_reports_snapshot_model_time (snapshot_hash, model, generated_at)
+        )
+        """
+    )
+
+
+def query_sleep_daily_rows(cur, *, start: Optional[str] = None, end: Optional[str] = None) -> list[dict]:
+    date_conditions, date_params = build_date_filters("local_date", start, end)
+    extra_where = (" AND " + " AND ".join(date_conditions)) if date_conditions else ""
+    cur.execute(
+        f"""
+        SELECT local_date AS date,
+               SUM(TIMESTAMPDIFF(SECOND, start_at, end_at)) / 3600.0 AS total_hours,
+               MIN(start_at) AS sleep_start,
+               MAX(end_at) AS sleep_end
+        FROM health_records
+        WHERE type = %s
+          AND value_text NOT IN (%s, %s)
+          AND (
+              value_text <> %s
+              OR local_date NOT IN (
+                  SELECT DISTINCT local_date FROM health_records
+                  WHERE type = %s
+                    AND value_text IN (%s, %s, %s)
+                    {extra_where}
+              )
+          )
+          {extra_where}
+        GROUP BY local_date
+        ORDER BY local_date
+        """,
+        [
+            "HKCategoryTypeIdentifierSleepAnalysis",
+            "HKCategoryValueSleepAnalysisInBed",
+            "HKCategoryValueSleepAnalysisAwake",
+            "HKCategoryValueSleepAnalysisAsleepUnspecified",
+            "HKCategoryTypeIdentifierSleepAnalysis",
+            "HKCategoryValueSleepAnalysisAsleepCore",
+            "HKCategoryValueSleepAnalysisAsleepDeep",
+            "HKCategoryValueSleepAnalysisAsleepREM",
+            *date_params,
+            *date_params,
+        ],
+    )
+    return rows_to_list(cur.fetchall())
+
+
+def query_daily_heart_rate_rows(cur, *, start: Optional[str] = None, end: Optional[str] = None) -> list[dict]:
+    conditions = ["type = %s", "value_num IS NOT NULL"]
+    params: list = ["HKQuantityTypeIdentifierHeartRate"]
+    date_conditions, date_params = build_date_filters("local_date", start, end)
+    conditions.extend(date_conditions)
+    params.extend(date_params)
+    cur.execute(
+        f"""
+        SELECT local_date AS date,
+               AVG(value_num) AS avg_bpm,
+               MIN(value_num) AS min_bpm,
+               MAX(value_num) AS max_bpm,
+               COUNT(*) AS count
+        FROM health_records
+        WHERE {" AND ".join(conditions)}
+        GROUP BY local_date
+        ORDER BY local_date
+        """,
+        params,
+    )
+    return rows_to_list(cur.fetchall())
 
 
 def compact_dict(values: dict[str, Any]) -> dict[str, Any]:
@@ -326,11 +670,17 @@ class IngestPayload(BaseModel):
     anchors: dict[str, str] = Field(default_factory=dict)
 
 
+class DashboardAIRequest(BaseModel):
+    model: str | None = None
+    force_refresh: bool = False
+
+
 @app.on_event("startup")
 def startup() -> None:
     with get_db() as db, db.cursor() as cur:
         ensure_import_status_schema(cur)
         ensure_ingest_tables(cur)
+        ensure_dashboard_ai_schema(cur)
 
 
 def get_xml_record_total() -> int | None:
@@ -917,6 +1267,434 @@ def get_device_sync_anchors(
     }
 
 
+@app.get("/api/dashboard/home")
+def get_dashboard_home():
+    now = datetime.now(LOCAL_TIMEZONE).replace(tzinfo=None, microsecond=0)
+    today = now.date()
+    fourteen_days_ago = (today - timedelta(days=13)).isoformat()
+    thirty_days_ago = (today - timedelta(days=29)).isoformat()
+
+    with get_db() as db, db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(value_num), 0) AS v
+            FROM health_records
+            WHERE type=%s AND local_date=CURDATE()
+            """,
+            ("HKQuantityTypeIdentifierStepCount",),
+        )
+        steps_today = as_int(cur.fetchone()["v"])
+
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(value_num), 0) AS v
+            FROM health_records
+            WHERE type=%s AND local_date=CURDATE()
+            """,
+            ("HKQuantityTypeIdentifierActiveEnergyBurned",),
+        )
+        active_calories_today = as_int(cur.fetchone()["v"])
+
+        cur.execute(
+            """
+            SELECT AVG(value_num) AS avg, MIN(value_num) AS min, MAX(value_num) AS max, COUNT(*) AS cnt
+            FROM health_records
+            WHERE type=%s AND local_date=CURDATE() AND value_num IS NOT NULL
+            """,
+            ("HKQuantityTypeIdentifierHeartRate",),
+        )
+        today_hr = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT local_date AS date, SUM(value_num) AS steps
+            FROM health_records
+            WHERE type=%s AND local_date >= %s
+            GROUP BY local_date
+            ORDER BY local_date
+            """,
+            ("HKQuantityTypeIdentifierStepCount", fourteen_days_ago),
+        )
+        step_rows = rows_to_list(cur.fetchall())
+
+        sleep_rows = query_sleep_daily_rows(cur, start=fourteen_days_ago)
+        hr_rows = query_daily_heart_rate_rows(cur, start=thirty_days_ago)
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS count,
+                   ROUND(SUM(duration), 1) AS total_minutes,
+                   ROUND(SUM(total_energy_burned), 0) AS total_calories
+            FROM workouts
+            WHERE start_at >= (CURDATE() - INTERVAL 6 DAY)
+            """
+        )
+        workouts_7d = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS count,
+                   ROUND(SUM(duration), 1) AS total_minutes,
+                   ROUND(SUM(total_energy_burned), 0) AS total_calories
+            FROM workouts
+            WHERE start_at >= (CURDATE() - INTERVAL 29 DAY)
+            """
+        )
+        workouts_30d = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT id, activity_type, duration, duration_unit, total_distance,
+                   total_distance_unit, total_energy_burned, total_energy_burned_unit,
+                   source_name, start_at, end_at, local_date AS date, route_file
+            FROM workouts
+            WHERE start_at >= (CURDATE() - INTERVAL 29 DAY)
+            ORDER BY start_at DESC
+            LIMIT 6
+            """
+        )
+        recent_workouts = rows_to_list(cur.fetchall())
+
+        cur.execute(
+            """
+            SELECT activity_type,
+                   COUNT(*) AS count,
+                   ROUND(SUM(duration), 1) AS total_minutes,
+                   ROUND(SUM(total_energy_burned), 0) AS total_calories
+            FROM workouts
+            WHERE start_at >= (CURDATE() - INTERVAL 29 DAY)
+            GROUP BY activity_type
+            ORDER BY count DESC, total_minutes DESC
+            LIMIT 5
+            """
+        )
+        workout_mix = rows_to_list(cur.fetchall())
+
+        cur.execute(
+            """
+            SELECT type, COUNT(*) AS count_7d, MAX(start_at) AS last_at
+            FROM health_records
+            WHERE start_at >= (NOW() - INTERVAL 7 DAY)
+            GROUP BY type
+            ORDER BY count_7d DESC, last_at DESC
+            LIMIT 8
+            """
+        )
+        recent_types = rows_to_list(cur.fetchall())
+
+        ensure_ingest_tables(cur)
+        cur.execute(
+            """
+            SELECT MAX(received_at) AS last_sync_at,
+                   COUNT(*) AS today_sync_count,
+                   SUM(accepted_count) AS today_sync_accepted
+            FROM ingest_events
+            WHERE status='completed'
+              AND received_at >= CURDATE()
+              AND received_at < (CURDATE() + INTERVAL 1 DAY)
+            """
+        )
+        today_sync = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT MAX(received_at) AS last_sync_at
+            FROM ingest_events
+            WHERE status='completed'
+            """
+        )
+        sync_overall = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT device_id, bundle_id, last_seen_at, last_sent_at, last_sync_at, last_sync_status,
+                   last_error_message, last_items_count, last_accepted_count, last_deduplicated_count, updated_at
+            FROM device_sync_state
+            ORDER BY updated_at DESC
+            LIMIT 5
+            """
+        )
+        devices = rows_to_list(cur.fetchall())
+
+    step_map = {row["date"].isoformat(): as_int(row.get("steps")) for row in step_rows}
+    steps_last_14_days = []
+    for offset in range(13, -1, -1):
+        date_key = (today - timedelta(days=offset)).isoformat()
+        steps_last_14_days.append({"date": date_key, "steps": step_map.get(date_key, 0)})
+    steps_last_7_days = steps_last_14_days[-7:]
+    steps_prev_7_days = steps_last_14_days[:7]
+    steps_total_7d = sum(item["steps"] for item in steps_last_7_days)
+    steps_avg_7d = steps_total_7d / 7 if steps_last_7_days else None
+    steps_avg_prev_7d = sum(item["steps"] for item in steps_prev_7_days) / 7 if steps_prev_7_days else None
+
+    sleep_last_7 = [round_or_none(row.get("total_hours"), 2) for row in sleep_rows[-7:]]
+    sleep_last_7 = [value for value in sleep_last_7 if value is not None]
+    sleep_prev_7 = [round_or_none(row.get("total_hours"), 2) for row in sleep_rows[:-7]]
+    sleep_prev_7 = [value for value in sleep_prev_7 if value is not None]
+    last_sleep = sleep_rows[-1] if sleep_rows else None
+
+    hr_last_7_avg = mean([float(row["avg_bpm"]) for row in hr_rows[-7:] if row.get("avg_bpm") is not None])
+    hr_prev_7_avg = mean([float(row["avg_bpm"]) for row in hr_rows[-14:-7] if row.get("avg_bpm") is not None])
+
+    last_sync_at = sync_overall.get("last_sync_at")
+    hours_since_last_sync = None
+    if last_sync_at:
+        hours_since_last_sync = round((now - last_sync_at).total_seconds() / 3600, 1)
+
+    insights: list[dict[str, Any]] = []
+    if hours_since_last_sync is None:
+        insights.append({
+            "level": "warn",
+            "title": "还没有同步记录",
+            "detail": "首页先聚焦近期状态，但当前服务端还没有收到 bridge 的完成同步事件。",
+        })
+    elif hours_since_last_sync >= 24:
+        insights.append({
+            "level": "warn",
+            "title": "最近 24 小时没有新同步",
+            "detail": f"距离上次完成同步已过去 {hours_since_last_sync} 小时，近期数据可能不是最新。",
+        })
+
+    sleep_avg_7d = mean(sleep_last_7)
+    sleep_avg_prev_7d = mean(sleep_prev_7)
+    if sleep_avg_7d is not None and sleep_avg_7d < 7:
+        insights.append({
+            "level": "notice",
+            "title": "近 7 晚平均睡眠偏少",
+            "detail": f"最近 7 晚平均约 {round(sleep_avg_7d, 1)} 小时，可以单独追踪晚睡和补觉波动。",
+            "raw_type": "HKCategoryTypeIdentifierSleepAnalysis",
+        })
+
+    if steps_avg_7d is not None and steps_avg_prev_7d and steps_avg_7d < steps_avg_prev_7d * 0.8:
+        insights.append({
+            "level": "notice",
+            "title": "最近一周活动量下降",
+            "detail": f"近 7 天日均步数 {round(steps_avg_7d):,}，低于前一周的 {round(steps_avg_prev_7d):,}。",
+            "raw_type": "HKQuantityTypeIdentifierStepCount",
+        })
+    elif steps_avg_7d is not None and steps_avg_7d >= 8000:
+        insights.append({
+            "level": "good",
+            "title": "最近一周步数保持不错",
+            "detail": f"近 7 天日均步数约 {round(steps_avg_7d):,}，首页可以继续把步数作为主维度展示。",
+            "raw_type": "HKQuantityTypeIdentifierStepCount",
+        })
+
+    if as_int(workouts_7d.get("count")) == 0:
+        insights.append({
+            "level": "notice",
+            "title": "最近 7 天没有运动记录",
+            "detail": "可以把首页的训练卡片作为提醒入口，而不是放全历史运动总量。",
+        })
+    elif recent_workouts:
+        last_workout = recent_workouts[0]
+        insights.append({
+            "level": "good",
+            "title": "最近训练还在持续",
+            "detail": f"最近一次训练是 {last_workout.get('date')} 的 {last_workout.get('activity_type') or '运动'}。",
+        })
+
+    return {
+        "generated_at": now,
+        "ai": get_ai_config(),
+        "today": {
+            "steps": steps_today,
+            "active_calories": active_calories_today,
+            "heart_rate": {
+                "avg": round_or_none(today_hr.get("avg"), 1),
+                "min": round_or_none(today_hr.get("min"), 1),
+                "max": round_or_none(today_hr.get("max"), 1),
+                "count": as_int(today_hr.get("cnt")),
+            },
+        },
+        "steps": {
+            "today": steps_today,
+            "last_7_days": steps_last_7_days,
+            "total_7d": steps_total_7d,
+            "avg_7d": round_or_none(steps_avg_7d, 1),
+            "avg_prev_7d": round_or_none(steps_avg_prev_7d, 1),
+            "delta_vs_prev_7d": percent_change(steps_avg_7d, steps_avg_prev_7d),
+        },
+        "sleep": {
+            "last_14_days": sleep_rows,
+            "last_night_hours": round_or_none(last_sleep.get("total_hours"), 2) if last_sleep else None,
+            "last_sleep_start": last_sleep.get("sleep_start") if last_sleep else None,
+            "last_sleep_end": last_sleep.get("sleep_end") if last_sleep else None,
+            "avg_7d": round_or_none(sleep_avg_7d, 2),
+            "avg_prev_7d": round_or_none(sleep_avg_prev_7d, 2),
+            "delta_vs_prev_7d": percent_change(sleep_avg_7d, sleep_avg_prev_7d),
+        },
+        "heart_rate": {
+            "last_30_days": hr_rows,
+            "avg_7d": round_or_none(hr_last_7_avg, 1),
+            "avg_prev_7d": round_or_none(hr_prev_7_avg, 1),
+            "delta_vs_prev_7d": percent_change(hr_last_7_avg, hr_prev_7_avg),
+        },
+        "workouts": {
+            "count_7d": as_int(workouts_7d.get("count")),
+            "count_30d": as_int(workouts_30d.get("count")),
+            "total_minutes_7d": round_or_none(workouts_7d.get("total_minutes"), 1),
+            "total_minutes_30d": round_or_none(workouts_30d.get("total_minutes"), 1),
+            "total_calories_30d": as_int(workouts_30d.get("total_calories")),
+            "last_workout": recent_workouts[0] if recent_workouts else None,
+            "recent": recent_workouts,
+            "summary_30d": workout_mix,
+        },
+        "recent_types": recent_types,
+        "sync": {
+            "last_sync_at": last_sync_at,
+            "hours_since_last_sync": hours_since_last_sync,
+            "today_sync_count": as_int(today_sync.get("today_sync_count")),
+            "today_sync_accepted": as_int(today_sync.get("today_sync_accepted")),
+            "devices": devices,
+        },
+        "insights": insights[:4],
+    }
+
+
+def fetch_recent_ai_report_from_db(snapshot_hash: str, model: str, *, max_age_seconds: int) -> dict[str, Any] | None:
+    threshold = datetime.now(LOCAL_TIMEZONE).replace(tzinfo=None, microsecond=0) - timedelta(seconds=max_age_seconds)
+    with get_db() as db, db.cursor() as cur:
+        ensure_dashboard_ai_schema(cur)
+        cur.execute(
+            """
+            SELECT id, snapshot_hash, model, title, summary, bullets_json, watchouts_json,
+                   next_focus_json, confidence, usage_json, generated_at
+            FROM ai_dashboard_reports
+            WHERE snapshot_hash=%s AND model=%s AND generated_at >= %s
+            ORDER BY generated_at DESC, id DESC
+            LIMIT 1
+            """,
+            (snapshot_hash, model, threshold),
+        )
+        row = cur.fetchone()
+    return row_to_ai_report(row) if row else None
+
+
+def store_ai_report(
+    *,
+    snapshot_hash: str,
+    model: str,
+    analysis: dict[str, Any],
+    usage: dict[str, Any],
+    snapshot_payload: dict[str, Any],
+) -> dict[str, Any]:
+    normalized = normalize_ai_analysis(analysis)
+    with get_db() as db, db.cursor() as cur:
+        ensure_dashboard_ai_schema(cur)
+        cur.execute(
+            """
+            INSERT INTO ai_dashboard_reports (
+                snapshot_hash, model, title, summary, bullets_json, watchouts_json,
+                next_focus_json, confidence, usage_json, snapshot_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                snapshot_hash,
+                model,
+                normalized["title"],
+                normalized["summary"],
+                json.dumps(normalized["bullets"], ensure_ascii=False),
+                json.dumps(normalized["watchouts"], ensure_ascii=False),
+                json.dumps(normalized["next_focus"], ensure_ascii=False),
+                normalized["confidence"] or None,
+                json.dumps(usage or {}, ensure_ascii=False),
+                json.dumps(snapshot_payload, ensure_ascii=False, default=str),
+            ),
+        )
+        report_id = int(cur.lastrowid)
+        cur.execute(
+            """
+            SELECT id, snapshot_hash, model, title, summary, bullets_json, watchouts_json,
+                   next_focus_json, confidence, usage_json, generated_at
+            FROM ai_dashboard_reports
+            WHERE id=%s
+            """,
+            (report_id,),
+        )
+        row = cur.fetchone()
+    return row_to_ai_report(row)
+
+
+@app.get("/api/dashboard/ai-reports")
+def list_dashboard_ai_reports(limit: int = Query(6, ge=1, le=30)):
+    with get_db() as db, db.cursor() as cur:
+        ensure_dashboard_ai_schema(cur)
+        cur.execute(
+            """
+            SELECT id, snapshot_hash, model, title, summary, bullets_json, watchouts_json,
+                   next_focus_json, confidence, usage_json, generated_at
+            FROM ai_dashboard_reports
+            ORDER BY generated_at DESC, id DESC
+            LIMIT %s
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    return [row_to_ai_report(row) for row in rows]
+
+
+@app.post("/api/dashboard/ai-analysis")
+def get_dashboard_ai_analysis(payload: DashboardAIRequest):
+    model = resolve_ai_model(payload.model)
+    home = get_dashboard_home()
+    cache_key = build_ai_cache_key(model, home)
+    now_ts = time.time()
+    cached = _dashboard_ai_cache.get(cache_key)
+    if cached and not payload.force_refresh and now_ts - cached["created_at_ts"] <= AI_ANALYSIS_CACHE_TTL_SECONDS:
+        return {
+            "model": model,
+            "cached": True,
+            "generated_at": cached["generated_at"],
+            "analysis": cached["analysis"],
+            "usage": cached["usage"],
+        }
+
+    if not payload.force_refresh:
+        db_cached = fetch_recent_ai_report_from_db(cache_key, model, max_age_seconds=AI_ANALYSIS_CACHE_TTL_SECONDS)
+        if db_cached:
+            _dashboard_ai_cache[cache_key] = {
+                "created_at_ts": now_ts,
+                "generated_at": db_cached["generated_at"],
+                "analysis": db_cached["analysis"],
+                "usage": db_cached["usage"],
+            }
+            return {
+                "model": model,
+                "cached": True,
+                "generated_at": db_cached["generated_at"],
+                "analysis": db_cached["analysis"],
+                "usage": db_cached["usage"],
+            }
+
+    prompt = build_ai_dashboard_prompt(home)
+    analysis, usage = request_openrouter_analysis(prompt, model)
+    stored_report = store_ai_report(
+        snapshot_hash=cache_key,
+        model=model,
+        analysis=analysis,
+        usage=usage,
+        snapshot_payload={
+            "home": home,
+        },
+    )
+    result = {
+        "created_at_ts": now_ts,
+        "generated_at": stored_report["generated_at"],
+        "analysis": stored_report["analysis"],
+        "usage": stored_report["usage"],
+    }
+    _dashboard_ai_cache[cache_key] = result
+    return {
+        "model": model,
+        "cached": False,
+        "generated_at": result["generated_at"],
+        "analysis": result["analysis"],
+        "usage": result["usage"],
+    }
+
+
 @app.get("/api/records/types")
 def list_record_types():
     with get_db() as db, db.cursor() as cur:
@@ -1137,20 +1915,7 @@ def get_heart_rate(
                 params,
             )
         else:
-            cur.execute(
-                f"""
-                SELECT local_date AS date,
-                       AVG(value_num) AS avg_bpm,
-                       MIN(value_num) AS min_bpm,
-                       MAX(value_num) AS max_bpm,
-                       COUNT(*) AS count
-                FROM health_records
-                WHERE {where}
-                GROUP BY local_date
-                ORDER BY local_date
-                """,
-                params,
-            )
+            return query_daily_heart_rate_rows(cur, start=start, end=end)
         return rows_to_list(cur.fetchall())
 
 
@@ -1186,48 +1951,8 @@ def get_sleep(start: Optional[str] = Query(None), end: Optional[str] = Query(Non
 
 @app.get("/api/sleep/daily")
 def get_sleep_daily(start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
-    # Exclude InBed and Awake. For AsleepUnspecified, only include it on days
-    # where detailed stages (Core/Deep/REM) are absent, to avoid double-counting.
-    date_conditions, date_params = build_date_filters("local_date", start, end)
-    extra_where = (" AND " + " AND ".join(date_conditions)) if date_conditions else ""
-
     with get_db() as db, db.cursor() as cur:
-        cur.execute(
-            f"""
-            SELECT local_date AS date,
-                   SUM(TIMESTAMPDIFF(SECOND, start_at, end_at)) / 3600.0 AS total_hours,
-                   MIN(start_at) AS sleep_start,
-                   MAX(end_at) AS sleep_end
-            FROM health_records
-            WHERE type = %s
-              AND value_text NOT IN (%s, %s)
-              AND (
-                  value_text <> %s
-                  OR local_date NOT IN (
-                      SELECT DISTINCT local_date FROM health_records
-                      WHERE type = %s
-                        AND value_text IN (%s, %s, %s)
-                        {extra_where}
-                  )
-              )
-              {extra_where}
-            GROUP BY local_date
-            ORDER BY local_date
-            """,
-            [
-                "HKCategoryTypeIdentifierSleepAnalysis",
-                "HKCategoryValueSleepAnalysisInBed",
-                "HKCategoryValueSleepAnalysisAwake",
-                "HKCategoryValueSleepAnalysisAsleepUnspecified",
-                "HKCategoryTypeIdentifierSleepAnalysis",
-                "HKCategoryValueSleepAnalysisAsleepCore",
-                "HKCategoryValueSleepAnalysisAsleepDeep",
-                "HKCategoryValueSleepAnalysisAsleepREM",
-                *date_params,
-                *date_params,
-            ],
-        )
-        return rows_to_list(cur.fetchall())
+        return query_sleep_daily_rows(cur, start=start, end=end)
 
 
 @app.get("/api/body-metrics")

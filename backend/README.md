@@ -58,6 +58,31 @@ docker compose run --rm importer
 - 进度逻辑不需要重写，仍然复用 MySQL 中的 `import_batches` / `import_files` / `last_progress_at`
 - 如果中断后重跑，仍然走现有的残留 `running` 清理和断点恢复逻辑
 
+### AI 首页分析
+
+首页现在支持可选的 OpenRouter AI 分析卡片。
+
+需要这些环境变量：
+
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_MODEL`
+  - 默认：`anthropic/claude-sonnet-4.6`
+- `OPENROUTER_ALLOWED_MODELS`
+  - 默认：`anthropic/claude-sonnet-4.6,minimax/minimax-m2.7`
+
+可选：
+
+- `OPENROUTER_APP_NAME`
+- `OPENROUTER_SITE_URL`
+- `AI_ANALYSIS_CACHE_TTL_SECONDS`
+
+说明：
+
+- AI 分析不会在首页自动调用
+- 需要用户手动点击“生成分析”
+- 后端会对同一份近期数据做短时缓存，避免重复消耗 token
+- 成功生成的首页 AI 报告会写入 `ai_dashboard_reports`
+
 查看 importer 实时输出：
 
 ```bash
