@@ -227,6 +227,116 @@ def get_workout_routes(limit: int = Query(12, ge=1, le=50)):
     return list_response(rows, limit=limit)
 
 
+@router.get("/api/workouts/routes/heatmap")
+def get_workout_routes_heatmap(
+    route_limit: int = Query(24, ge=4, le=80),
+    max_points: int = Query(12000, ge=1000, le=50000),
+):
+    with get_db() as db, db.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                wr.id AS route_id,
+                w.id AS workout_id,
+                w.activity_type,
+                w.local_date AS date,
+                w.start_at
+            FROM workouts w
+            JOIN workout_routes wr ON wr.file_path = w.route_file
+            WHERE w.route_file IS NOT NULL
+              AND w.route_file <> ''
+            ORDER BY w.start_at DESC, w.id DESC
+            LIMIT %s
+            """,
+            (route_limit,),
+        )
+        route_rows = rows_to_list(cur.fetchall())
+        if not route_rows:
+            return api_response(
+                {
+                    "routes": [],
+                    "points": [],
+                    "summary": {
+                        "routes": 0,
+                        "total_points": 0,
+                        "returned_points": 0,
+                        "sample_step": 1,
+                    },
+                }
+            )
+
+        route_ids = [row["route_id"] for row in route_rows]
+        placeholders = ", ".join(["%s"] * len(route_ids))
+        cur.execute(
+            f"""
+            SELECT
+                COUNT(*) AS total_points,
+                MIN(latitude) AS min_lat,
+                MAX(latitude) AS max_lat,
+                MIN(longitude) AS min_lng,
+                MAX(longitude) AS max_lng
+            FROM route_points
+            WHERE route_id IN ({placeholders})
+            """,
+            route_ids,
+        )
+        aggregate = cur.fetchone() or {}
+
+        total_points = int(aggregate.get("total_points") or 0)
+        sample_step = max(1, math.ceil(total_points / max_points)) if total_points else 1
+        cur.execute(
+            f"""
+            SELECT route_id, latitude, longitude
+            FROM route_points
+            WHERE route_id IN ({placeholders})
+              AND MOD(point_index, %s) = 0
+            ORDER BY route_id, point_index
+            """,
+            route_ids + [sample_step],
+        )
+        point_rows = rows_to_list(cur.fetchall())
+
+    route_meta = {row["route_id"]: row for row in route_rows}
+    points = []
+    for row in point_rows:
+        route_meta_row = route_meta.get(row["route_id"], {})
+        points.append(
+            {
+                "route_id": row["route_id"],
+                "workout_id": route_meta_row.get("workout_id"),
+                "activity_type": route_meta_row.get("activity_type"),
+                "date": route_meta_row.get("date"),
+                "latitude": float(row["latitude"]),
+                "longitude": float(row["longitude"]),
+                "intensity": 0.7,
+            }
+        )
+
+    bounds = (
+        [[float(aggregate["min_lat"]), float(aggregate["min_lng"])], [float(aggregate["max_lat"]), float(aggregate["max_lng"])]]
+        if aggregate.get("min_lat") is not None and aggregate.get("min_lng") is not None and aggregate.get("max_lat") is not None and aggregate.get("max_lng") is not None
+        else None
+    )
+    summary = {
+        "routes": len(route_rows),
+        "total_points": total_points,
+        "returned_points": len(points),
+        "sample_step": sample_step,
+        "date_from": str(route_rows[-1]["date"]) if route_rows else None,
+        "date_to": str(route_rows[0]["date"]) if route_rows else None,
+    }
+    return api_response(
+        {
+            "routes": route_rows,
+            "points": points,
+            "bounds": bounds,
+            "summary": summary,
+        },
+        route_limit=route_limit,
+        max_points=max_points,
+    )
+
+
 @router.get("/api/workouts/{workout_id}/route")
 def get_workout_route(workout_id: int, max_points: int = Query(2500, ge=200, le=10000)):
     with get_db() as db, db.cursor() as cur:

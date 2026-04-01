@@ -134,9 +134,14 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 
 ```json
 {
-  "ok": true,
-  "accepted": 120,
-  "deduplicated": 30
+  "data": {
+    "ok": true,
+    "accepted": 120,
+    "deduplicated": 30
+  },
+  "meta": {
+    "generated_at": "2026-04-01T12:00:00+08:00"
+  }
 }
 ```
 
@@ -232,7 +237,6 @@ GET /api/records/recent?device_id=primary-iphone&type=HKQuantityTypeIdentifierHe
 
 ```json
 {
-  "total": 2,
   "data": [
     {
       "id": 123456,
@@ -259,7 +263,13 @@ GET /api/records/recent?device_id=primary-iphone&type=HKQuantityTypeIdentifierHe
       "bridge_kind": "sample",
       "bridge_source": "healthkit"
     }
-  ]
+  ],
+  "meta": {
+    "generated_at": "2026-04-01T12:00:00+08:00",
+    "total": 2,
+    "limit": 20,
+    "offset": 0
+  }
 }
 ```
 
@@ -271,37 +281,42 @@ GET /api/records/recent?device_id=primary-iphone&type=HKQuantityTypeIdentifierHe
 
 ```json
 {
-  "devices": [
-    {
-      "device_id": "iphone-15-pro-max",
-      "bundle_id": "com.example.myAppleHealthyBridge",
-      "last_seen_at": "2026-03-31T16:31:00",
-      "last_sent_at": "2026-03-31T16:30:58",
-      "last_sync_at": "2026-03-31T16:31:00",
-      "last_sync_status": "completed",
-      "last_error_message": null,
-      "last_items_count": 120,
-      "last_accepted_count": 120,
-      "last_deduplicated_count": 30,
-      "updated_at": "2026-03-31T16:31:00",
-      "anchor_count": 4,
-      "anchors_updated_at": "2026-03-31T16:31:00"
-    }
-  ],
-  "recent_events": [
-    {
-      "id": 18,
-      "device_id": "iphone-15-pro-max",
-      "bundle_id": "com.example.myAppleHealthyBridge",
-      "sent_at": "2026-03-31T16:30:58",
-      "received_at": "2026-03-31T16:31:00",
-      "item_count": 120,
-      "accepted_count": 120,
-      "deduplicated_count": 30,
-      "status": "completed",
-      "error_message": null
-    }
-  ]
+  "data": {
+    "devices": [
+      {
+        "device_id": "iphone-15-pro-max",
+        "bundle_id": "com.example.myAppleHealthyBridge",
+        "last_seen_at": "2026-03-31T16:31:00",
+        "last_sent_at": "2026-03-31T16:30:58",
+        "last_sync_at": "2026-03-31T16:31:00",
+        "last_sync_status": "completed",
+        "last_error_message": null,
+        "last_items_count": 120,
+        "last_accepted_count": 120,
+        "last_deduplicated_count": 30,
+        "updated_at": "2026-03-31T16:31:00",
+        "anchor_count": 4,
+        "anchors_updated_at": "2026-03-31T16:31:00"
+      }
+    ],
+    "recent_events": [
+      {
+        "id": 18,
+        "device_id": "iphone-15-pro-max",
+        "bundle_id": "com.example.myAppleHealthyBridge",
+        "sent_at": "2026-03-31T16:30:58",
+        "received_at": "2026-03-31T16:31:00",
+        "item_count": 120,
+        "accepted_count": 120,
+        "deduplicated_count": 30,
+        "status": "completed",
+        "error_message": null
+      }
+    ]
+  },
+  "meta": {
+    "generated_at": "2026-04-01T12:00:00+08:00"
+  }
 }
 ```
 
@@ -334,37 +349,42 @@ GET /api/device-sync-state/anchors?device_id=iphone-15-pro-max&bundle_id=com.exa
 
 ```json
 {
-  "device": {
-    "device_id": "iphone-15-pro-max",
-    "bundle_id": "com.example.myAppleHealthyBridge",
-    "last_seen_at": "2026-03-31T16:31:00",
-    "last_sent_at": "2026-03-31T16:30:58",
-    "last_sync_at": "2026-03-31T16:31:00",
-    "last_sync_status": "completed",
-    "last_error_message": null,
-    "last_items_count": 120,
-    "last_accepted_count": 120,
-    "last_deduplicated_count": 30,
-    "updated_at": "2026-03-31T16:31:00",
-    "anchor_count": 4,
-    "anchors_updated_at": "2026-03-31T16:31:00"
-  },
-  "anchors": {
-    "HKQuantityTypeIdentifierHeartRate": "base64-anchor",
-    "HKCategoryTypeIdentifierSleepAnalysis": "base64-anchor"
-  },
-  "anchor_records": [
-    {
-      "record_type": "HKCategoryTypeIdentifierSleepAnalysis",
-      "anchor_value": "base64-anchor",
-      "updated_at": "2026-03-31T16:31:00"
+  "data": {
+    "device": {
+      "device_id": "iphone-15-pro-max",
+      "bundle_id": "com.example.myAppleHealthyBridge",
+      "last_seen_at": "2026-03-31T16:31:00",
+      "last_sent_at": "2026-03-31T16:30:58",
+      "last_sync_at": "2026-03-31T16:31:00",
+      "last_sync_status": "completed",
+      "last_error_message": null,
+      "last_items_count": 120,
+      "last_accepted_count": 120,
+      "last_deduplicated_count": 30,
+      "updated_at": "2026-03-31T16:31:00",
+      "anchor_count": 4,
+      "anchors_updated_at": "2026-03-31T16:31:00"
     },
-    {
-      "record_type": "HKQuantityTypeIdentifierHeartRate",
-      "anchor_value": "base64-anchor",
-      "updated_at": "2026-03-31T16:31:00"
-    }
-  ]
+    "anchors": {
+      "HKQuantityTypeIdentifierHeartRate": "base64-anchor",
+      "HKCategoryTypeIdentifierSleepAnalysis": "base64-anchor"
+    },
+    "anchor_records": [
+      {
+        "record_type": "HKCategoryTypeIdentifierSleepAnalysis",
+        "anchor_value": "base64-anchor",
+        "updated_at": "2026-03-31T16:31:00"
+      },
+      {
+        "record_type": "HKQuantityTypeIdentifierHeartRate",
+        "anchor_value": "base64-anchor",
+        "updated_at": "2026-03-31T16:31:00"
+      }
+    ]
+  },
+  "meta": {
+    "generated_at": "2026-04-01T12:00:00+08:00"
+  }
 }
 ```
 

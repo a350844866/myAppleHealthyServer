@@ -8,11 +8,14 @@ const dashboardState = {
   workoutWeekly: null,
   routeSummaries: [],
   routeDetail: null,
+  routeHeatmap: null,
   activeRouteId: null,
+  routeMode: "route",
 };
 const chartRegistry = {};
 let routeMap = null;
 let routeLayerGroup = null;
+let routeRequestSeq = 0;
 
 const MODEL_LABELS = {
   "minimax/minimax-m2.7": "MiniMax M2.7",
@@ -626,6 +629,12 @@ function ensureRouteMap() {
   return routeMap;
 }
 
+function syncRouteModeButtons() {
+  document.querySelectorAll("[data-route-mode]").forEach(button => {
+    button.classList.toggle("active", button.dataset.routeMode === dashboardState.routeMode);
+  });
+}
+
 function renderRouteCards(detail) {
   const cards = document.getElementById("routeCards");
   cards.innerHTML = `
@@ -647,6 +656,28 @@ function renderRouteCards(detail) {
   `;
 }
 
+function renderRouteHeatmapCards(payload) {
+  const summary = payload && payload.summary ? payload.summary : {};
+  const cards = document.getElementById("routeCards");
+  cards.innerHTML = `
+    <div class="summary-card">
+      <div class="summary-label">覆盖路线</div>
+      <div class="summary-value">${fmtInt.format(summary.routes || 0)} 条</div>
+      <div class="summary-note">${summary.date_from && summary.date_to ? `${summary.date_from} 到 ${summary.date_to}` : "最近带 GPS 的训练"}</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">原始坐标点</div>
+      <div class="summary-value">${fmtInt.format(summary.total_points || 0)}</div>
+      <div class="summary-note">最近路线覆盖的总 GPS 点数</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">热力抽样</div>
+      <div class="summary-value">${fmtInt.format(summary.returned_points || 0)}</div>
+      <div class="summary-note">采样步长 ${summary.sample_step || 1}</div>
+    </div>
+  `;
+}
+
 function renderRouteList() {
   const root = document.getElementById("routeList");
   const routes = dashboardState.routeSummaries || [];
@@ -664,12 +695,18 @@ function renderRouteList() {
   root.querySelectorAll(".route-item").forEach(node => {
     node.addEventListener("click", () => {
       const workoutId = Number(node.dataset.routeId);
-      if (workoutId && workoutId !== dashboardState.activeRouteId) loadRouteDetail(workoutId);
+      if (workoutId) {
+        dashboardState.routeMode = "route";
+        syncRouteModeButtons();
+        if (workoutId !== dashboardState.activeRouteId || !dashboardState.routeDetail) loadRouteDetail(workoutId);
+        else renderRouteDetail(dashboardState.routeDetail);
+      }
     });
   });
 }
 
 function renderRouteEmpty(message) {
+  syncRouteModeButtons();
   document.getElementById("routeSummary").textContent = message;
   document.getElementById("routeMeta").textContent = "如果后续继续同步 workout route，这里会自动出现。";
   document.getElementById("routeCards").innerHTML = '<div class="empty-state">暂无路线摘要</div>';
@@ -683,6 +720,7 @@ function renderRouteEmpty(message) {
 }
 
 function renderRouteDetail(detail) {
+  syncRouteModeButtons();
   if (!detail || !Array.isArray(detail.sampled_points) || !detail.sampled_points.length) {
     renderRouteEmpty("这条训练没有可绘制的路线点。");
     return;
@@ -716,17 +754,60 @@ function renderRouteDetail(detail) {
   setTimeout(() => map.invalidateSize(), 0);
 }
 
+function renderRouteHeatmap(payload) {
+  syncRouteModeButtons();
+  if (!payload || !Array.isArray(payload.points) || !payload.points.length) {
+    renderRouteEmpty("最近没有足够的路线点可生成热力图。");
+    return;
+  }
+  document.getElementById("routeSummary").textContent = `最近 ${payload.summary.routes} 条带 GPS 的训练已经汇成常走热区。`;
+  document.getElementById("routeMeta").textContent = `${payload.summary.date_from} 到 ${payload.summary.date_to} · 原始 ${fmtInt.format(payload.summary.total_points || 0)} 点 · 返回 ${fmtInt.format(payload.summary.returned_points || 0)} 点`;
+  renderRouteHeatmapCards(payload);
+  renderRouteList();
+
+  const mapEl = document.getElementById("routeMap");
+  if (!routeMap) mapEl.innerHTML = "";
+  const map = ensureRouteMap();
+  if (!map) return;
+  if (typeof L.heatLayer !== "function") {
+    renderRouteEmpty("热力图插件未加载，当前只能查看单条轨迹。");
+    return;
+  }
+  routeLayerGroup.clearLayers();
+
+  const heatPoints = payload.points.map(point => [Number(point.latitude), Number(point.longitude), Number(point.intensity || 0.65)]);
+  const heatLayer = L.heatLayer(heatPoints, {
+    radius: 18,
+    blur: 14,
+    maxZoom: 16,
+    minOpacity: 0.32,
+    gradient: {
+      0.2: "#5ac8fa",
+      0.45: "#34c759",
+      0.72: "#ff9500",
+      1.0: "#ff3b30",
+    },
+  });
+  routeLayerGroup.addLayer(heatLayer);
+  if (payload.bounds) {
+    map.fitBounds(payload.bounds, { padding: [18, 18] });
+  }
+  setTimeout(() => map.invalidateSize(), 0);
+}
+
 async function loadRouteDetail(workoutId) {
+  const requestSeq = nextRouteRequestSeq();
   dashboardState.activeRouteId = workoutId;
   document.getElementById("routeMeta").textContent = "正在读取路线坐标…";
   renderRouteList();
   try {
     const detail = await api(`/api/workouts/${workoutId}/route?max_points=2500`);
-    if (dashboardState.activeRouteId !== workoutId) return;
+    if (requestSeq !== routeRequestSeq || dashboardState.activeRouteId !== workoutId || dashboardState.routeMode !== "route") return;
     dashboardState.routeDetail = detail;
     document.getElementById("routeSelect").value = String(workoutId);
     renderRouteDetail(detail);
   } catch (err) {
+    if (requestSeq !== routeRequestSeq) return;
     renderRouteEmpty(`路线读取失败: ${err.message}`);
   }
 }
@@ -748,7 +829,23 @@ function renderRouteOverview(routes) {
   dashboardState.activeRouteId = activeId;
   select.value = String(activeId);
   renderRouteList();
-  loadRouteDetail(activeId);
+  if (dashboardState.routeMode === "heat" && dashboardState.routeHeatmap) renderRouteHeatmap(dashboardState.routeHeatmap);
+  else loadRouteDetail(activeId);
+}
+
+function setRouteMode(mode) {
+  dashboardState.routeMode = mode === "heat" ? "heat" : "route";
+  if (dashboardState.routeMode === "heat") nextRouteRequestSeq();
+  syncRouteModeButtons();
+  if (dashboardState.routeMode === "heat") {
+    renderRouteHeatmap(dashboardState.routeHeatmap);
+    return;
+  }
+  if (dashboardState.routeDetail) {
+    renderRouteDetail(dashboardState.routeDetail);
+    return;
+  }
+  if (dashboardState.activeRouteId) loadRouteDetail(dashboardState.activeRouteId);
 }
 
 function renderModalLineChart(labels, values, { color, fill = null, yMin, label = "值", key = "modal-line", tooltipSuffix = "" }) {
@@ -1193,6 +1290,11 @@ function nextModalRequestSeq() {
   return modalRequestSeq;
 }
 
+function nextRouteRequestSeq() {
+  routeRequestSeq += 1;
+  return routeRequestSeq;
+}
+
 function closeModal() {
   clearModalChart();
   modal.classList.remove("open");
@@ -1386,19 +1488,21 @@ async function loadDashboard() {
   setLoadingState(true);
   document.getElementById("backendStatus").innerHTML = '<span class="status-dot warn"></span><span>正在加载…</span>';
   try {
-    const [home, aiReports, deviceSyncState, sleepQuality, workoutWeekly, routeSummaries] = await Promise.all([
+    const [home, aiReports, deviceSyncState, sleepQuality, workoutWeekly, routeSummaries, routeHeatmap] = await Promise.all([
       api("/api/dashboard/home"),
       api("/api/dashboard/ai-reports?limit=6").catch(() => []),
       api("/api/device-sync-state").catch(() => null),
       api(`/api/sleep/quality?start=${dateDaysAgo(13)}`).catch(() => null),
       api("/api/workouts/weekly-summary?weeks=12").catch(() => null),
       api("/api/workouts/routes?limit=12").catch(() => []),
+      api("/api/workouts/routes/heatmap?route_limit=24&max_points=12000").catch(() => null),
     ]);
     dashboardState.home = home;
     dashboardState.aiReports = Array.isArray(aiReports) ? aiReports : [];
     dashboardState.deviceSyncState = deviceSyncState;
     dashboardState.sleepQuality = sleepQuality;
     dashboardState.workoutWeekly = workoutWeekly;
+    dashboardState.routeHeatmap = routeHeatmap;
     renderStatus(home);
     renderHero(home);
     renderMetricCards(home);
@@ -1450,7 +1554,13 @@ document.getElementById("aiAnalyzeBtn").addEventListener("click", () => generate
 document.getElementById("aiRefreshBtn").addEventListener("click", () => generateAIAnalysis(true));
 document.getElementById("routeSelect").addEventListener("change", event => {
   const workoutId = Number(event.target.value);
-  if (workoutId) loadRouteDetail(workoutId);
+  if (workoutId) {
+    dashboardState.routeMode = "route";
+    loadRouteDetail(workoutId);
+  }
+});
+document.querySelectorAll("[data-route-mode]").forEach(button => {
+  button.addEventListener("click", () => setRouteMode(button.dataset.routeMode));
 });
 document.getElementById("modalClose").addEventListener("click", closeModal);
 modal.addEventListener("click", event => { if (event.target === modal) closeModal(); });

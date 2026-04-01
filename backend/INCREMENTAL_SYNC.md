@@ -1,5 +1,12 @@
 # 增量导入与告警方案
 
+当前状态补充：
+
+- `POST /ingest` 已落地
+- `GET /api/device-sync-state` / `GET /api/device-sync-state/anchors` 已落地
+- 服务端最小 anchor 恢复链路已落地
+- `alert_rules` / `alert_events` 仍未开始
+
 ## 先说结论
 
 如果你的数据源仍然是“苹果健康导出 XML”，那它更适合：

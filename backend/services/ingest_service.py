@@ -125,6 +125,26 @@ def _clear_caches() -> None:
         cur.execute("DELETE FROM record_type_stats")
 
 
+def _insert_failed_ingest_event(cur, *, payload: IngestPayload, accepted_count: int, error_message: str, payload_json: str) -> None:
+    cur.execute(
+        """
+        INSERT INTO ingest_events (
+            device_id, bundle_id, sent_at, item_count, accepted_count,
+            deduplicated_count, status, error_message, payload_json
+        )
+        VALUES (%s, %s, %s, %s, 0, 0, 'failed', %s, %s)
+        """,
+        (
+            payload.device_id,
+            payload.bundle_id,
+            normalize_ingest_datetime(payload.sent_at),
+            accepted_count,
+            error_message,
+            payload_json,
+        ),
+    )
+
+
 def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
     require_ingest_token(authorization)
 
@@ -135,6 +155,7 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
     payload_json = serialize_payload(payload)
     accepted_count = len(payload.items)
     deduplicated_count = 0
+    event_id: int | None = None
 
     try:
         with get_db(autocommit=False) as db, db.cursor() as cur:
@@ -158,7 +179,6 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
 
             rows = [health_record_row_from_ingest(payload, item) for item in payload.items]
             inserted_count = 0
-            business_deduped_count = 0
             if rows:
                 dedup_chunk = 200
                 existing_keys: set = set()
@@ -182,7 +202,6 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
                 filtered_rows = [
                     row for row in rows if (row[1], row[9], row[10], row[2]) not in existing_keys
                 ]
-                business_deduped_count = len(rows) - len(filtered_rows)
 
                 if filtered_rows:
                     cur.executemany(
@@ -197,7 +216,7 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
                     )
                     inserted_count = max(cur.rowcount, 0)
 
-            deduplicated_count = accepted_count - inserted_count - business_deduped_count
+            deduplicated_count = accepted_count - inserted_count
             upsert_device_sync_state(
                 cur,
                 payload=payload,
@@ -237,23 +256,31 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
                 deduplicated_count=0,
                 error_message=error_message,
             )
-            failed_cur.execute(
-                """
-                INSERT INTO ingest_events (
-                    device_id, bundle_id, sent_at, item_count, accepted_count,
-                    deduplicated_count, status, error_message, payload_json
+            if event_id is not None:
+                failed_cur.execute(
+                    """
+                    UPDATE ingest_events
+                    SET accepted_count=0, deduplicated_count=0, status='failed', error_message=%s
+                    WHERE id=%s
+                    """,
+                    (error_message, event_id),
                 )
-                VALUES (%s, %s, %s, %s, 0, 0, 'failed', %s, %s)
-                """,
-                (
-                    payload.device_id,
-                    payload.bundle_id,
-                    normalize_ingest_datetime(payload.sent_at),
-                    accepted_count,
-                    error_message,
-                    payload_json,
-                ),
-            )
+                if failed_cur.rowcount <= 0:
+                    _insert_failed_ingest_event(
+                        failed_cur,
+                        payload=payload,
+                        accepted_count=accepted_count,
+                        error_message=error_message,
+                        payload_json=payload_json,
+                    )
+            else:
+                _insert_failed_ingest_event(
+                    failed_cur,
+                    payload=payload,
+                    accepted_count=accepted_count,
+                    error_message=error_message,
+                    payload_json=payload_json,
+                )
         raise HTTPException(500, f"ingest failed: {error_message}") from exc
 
     _clear_caches()

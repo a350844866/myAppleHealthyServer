@@ -289,7 +289,13 @@
         <select id="routeSelect" class="route-select">
           <option>正在读取路线…</option>
         </select>
-        <div id="routeMeta" class="panel-subtitle">优先展示最近一条带路线的训练。</div>
+        <div class="route-toolbar-side">
+          <div id="routeModeGroup" class="route-mode-group">
+            <button class="route-mode-button active" data-route-mode="route" type="button">单条轨迹</button>
+            <button class="route-mode-button" data-route-mode="heat" type="button">常走热区</button>
+          </div>
+          <div id="routeMeta" class="panel-subtitle">优先展示最近一条带路线的训练。</div>
+        </div>
       </div>
       <div id="routeCards" class="summary-grid">
         <div class="summary-card" data-skeleton></div>
@@ -346,6 +352,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <script src="/dashboard/app.js"></script>
 </body>
 </html>

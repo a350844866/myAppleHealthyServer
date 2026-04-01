@@ -21,6 +21,7 @@
 - `GET /api/workouts/weekly-summary`
 - `GET /api/workouts/routes`
 - `GET /api/workouts/{id}/route`
+- `GET /api/workouts/routes/heatmap`
 
 dashboard 已完成这一轮优化：
 
@@ -30,6 +31,8 @@ dashboard 已完成这一轮优化：
 - 统一 API 响应 `{data, meta}`
 - 首页健康评分、睡眠质量、训练周报
 - 最近运动路线地图
+- 路线热力图
+- 后端自动化回归测试
 
 ## 仓库结构
 
@@ -88,6 +91,21 @@ export HEALTH_DB_PASSWORD='your-mysql-password'
 docker compose run --rm importer
 ```
 
+## 自动化测试
+
+当前已经补了一组后端回归测试，覆盖：
+
+- dashboard 响应包装
+- 运动路线接口采样
+- ingest 去重统计与失败更新逻辑
+
+运行方式：
+
+```bash
+python3 -m pip install -r backend/requirements.txt
+python3 -m pytest backend/tests
+```
+
 ## iOS 客户端联调
 
 iOS 客户端应把服务端根地址配置为：
@@ -120,6 +138,5 @@ http://your-server-host:18000
 - `health_records` 分区
 - `import_batches` 历史治理
 - 多设备对比分析完整版
-- 路线热力图
 - 训练周报完整分析页
 - `alert_rules` / `alert_events`

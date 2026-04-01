@@ -83,6 +83,21 @@ docker compose run --rm importer
 - 后端会对同一份近期数据做短时缓存，避免重复消耗 token
 - 成功生成的首页 AI 报告会写入 `ai_dashboard_reports`
 
+### API 响应格式
+
+当前接口统一使用：
+
+```json
+{
+  "data": {},
+  "meta": {
+    "generated_at": "2026-04-01T12:00:00+08:00"
+  }
+}
+```
+
+列表接口会在 `meta` 里额外带上 `total`、`limit`、`offset` 等信息。
+
 查看 importer 实时输出：
 
 ```bash
@@ -143,3 +158,21 @@ docker compose run --rm importer
   - 幂等去重写入 `health_records`
 - `GET /api/device-sync-state`
   - 查看最近设备同步状态与 ingest 事件
+
+dashboard 相关新增能力：
+
+- `GET /api/dashboard/home`
+- `GET /api/sleep/quality`
+- `GET /api/workouts/weekly-summary`
+- `GET /api/workouts/routes`
+- `GET /api/workouts/{id}/route`
+- `GET /api/workouts/routes/heatmap`
+
+## 自动化测试
+
+当前已经补了一组后端回归测试，运行方式：
+
+```bash
+python3 -m pip install -r backend/requirements.txt
+python3 -m pytest backend/tests
+```

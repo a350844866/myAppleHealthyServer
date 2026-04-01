@@ -460,6 +460,12 @@ body[data-theme="dark"] .device-mini {
   align-items: center;
 }
 
+.route-toolbar-side {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
 .route-select {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -469,6 +475,29 @@ body[data-theme="dark"] .device-mini {
   font-size: 13px;
   font-weight: 600;
   min-width: 0;
+}
+
+.route-mode-group {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.route-mode-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.route-mode-button.active {
+  color: white;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
 }
 
 .route-layout {
