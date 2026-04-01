@@ -3,1932 +3,349 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Apple Health Dashboard</title>
-  <style>
-    :root {
-      --bg: #f5efe4;
-      --panel: rgba(255, 252, 247, 0.94);
-      --line: #d9ccb7;
-      --text: #2f261d;
-      --muted: #766a5d;
-      --accent: #d35d47;
-      --accent-2: #3f7d6b;
-      --accent-3: #4a7fc4;
-      --warn: #b75b33;
-      --shadow: 0 20px 40px rgba(69, 48, 28, 0.08);
-    }
-
-    * { box-sizing: border-box; margin: 0; }
-
-    body {
-      font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at top right, rgba(211, 93, 71, 0.18), transparent 32%),
-        radial-gradient(circle at left bottom, rgba(63, 125, 107, 0.15), transparent 28%),
-        linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
-      min-height: 100vh;
-    }
-
-    .shell { max-width: 1320px; margin: 0 auto; padding: 28px 20px 48px; }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid rgba(118, 106, 93, 0.12);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 1.55fr 0.95fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .hero-main { padding: 30px; }
-    .hero-main h1 {
-      font-size: clamp(32px, 5vw, 52px);
-      line-height: 0.95;
-      letter-spacing: -0.05em;
-      margin-bottom: 12px;
-    }
-    .hero-main p {
-      color: var(--muted);
-      max-width: 760px;
-      line-height: 1.65;
-      font-size: 15px;
-    }
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 16px;
-      background: rgba(118, 106, 93, 0.08);
-      color: var(--text);
-    }
-    .hero-badge.good {
-      background: rgba(63, 125, 107, 0.12);
-      color: var(--accent-2);
-    }
-    .hero-badge.warn {
-      background: rgba(183, 91, 51, 0.12);
-      color: var(--warn);
-    }
-    .hero-badge.bad {
-      background: rgba(211, 93, 71, 0.12);
-      color: var(--accent);
-    }
-    .hero-badge.neutral {
-      background: rgba(118, 106, 93, 0.08);
-      color: var(--muted);
-    }
-    .signal-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 18px;
-    }
-    .signal-card {
-      border-radius: 18px;
-      padding: 14px 16px;
-      border: 1px solid rgba(118, 106, 93, 0.08);
-      background: rgba(118, 106, 93, 0.05);
-    }
-    .signal-card.good {
-      border-color: rgba(63, 125, 107, 0.18);
-      background: rgba(63, 125, 107, 0.06);
-    }
-    .signal-card.warn {
-      border-color: rgba(183, 91, 51, 0.18);
-      background: rgba(183, 91, 51, 0.06);
-    }
-    .signal-card.bad {
-      border-color: rgba(211, 93, 71, 0.18);
-      background: rgba(211, 93, 71, 0.06);
-    }
-    .signal-card.neutral {
-      border-color: rgba(118, 106, 93, 0.08);
-      background: rgba(118, 106, 93, 0.04);
-    }
-    .signal-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .signal-name {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--muted);
-    }
-    .signal-mark {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: rgba(118, 106, 93, 0.45);
-    }
-    .signal-card.good .signal-mark { background: var(--accent-2); }
-    .signal-card.warn .signal-mark { background: var(--warn); }
-    .signal-card.bad .signal-mark { background: var(--accent); }
-    .signal-level {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-    .signal-value {
-      font-size: 24px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      margin-bottom: 6px;
-    }
-    .signal-detail {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    .hero-side {
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      min-height: 220px;
-    }
-
-    .eyebrow {
-      color: var(--accent);
-      font-size: 12px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      margin-bottom: 14px;
-    }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--accent-2);
-      box-shadow: 0 0 0 6px rgba(63, 125, 107, 0.12);
-    }
-    .dot.red {
-      background: var(--accent);
-      box-shadow: 0 0 0 6px rgba(211, 93, 71, 0.12);
-    }
-
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-top: 18px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .toolbar button {
-      border: none;
-      border-radius: 12px;
-      background: var(--text);
-      color: white;
-      padding: 12px 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .toolbar button:hover { opacity: 0.85; }
-    .toolbar .hint { color: var(--muted); font-size: 13px; }
-
-    .focus-list {
-      display: grid;
-      gap: 10px;
-      margin-top: 4px;
-    }
-    .focus-item {
-      padding: 14px 16px;
-      border-radius: 18px;
-      background: rgba(118, 106, 93, 0.05);
-    }
-    .focus-item .label { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
-    .focus-item .value { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
-    .focus-item .sub { color: var(--muted); font-size: 13px; margin-top: 4px; line-height: 1.5; }
-
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-    .metric-card {
-      padding: 18px;
-      min-height: 116px;
-    }
-    .metric-card.clickable {
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-    }
-    .metric-card.clickable:hover {
-      background: rgba(63, 125, 107, 0.06);
-      transform: translateY(-2px);
-    }
-    .metric-card .label { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-    .metric-card .value { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; }
-    .metric-card .sub { color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.5; }
-
-    .content-grid {
-      display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      gap: 18px;
-    }
-    .stack { display: grid; gap: 18px; }
-
-    .chart-panel, .table-panel, .insight-panel { padding: 22px; }
-
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 18px;
-    }
-    .panel-title { font-size: 20px; letter-spacing: -0.03em; }
-    .panel-subtitle { color: var(--muted); font-size: 13px; line-height: 1.5; }
-
-    .pill {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(63, 125, 107, 0.12);
-      color: var(--accent-2);
-      font-size: 12px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .pill.red { background: rgba(211, 93, 71, 0.12); color: var(--accent); }
-    .pill.blue { background: rgba(74, 127, 196, 0.12); color: var(--accent-3); }
-    .pill.warn { background: rgba(183, 91, 51, 0.12); color: var(--warn); }
-
-    .bars {
-      display: grid;
-      align-items: end;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 10px;
-      height: 220px;
-      margin-top: 16px;
-    }
-    .bar-col {
-      display: flex;
-      flex-direction: column;
-      justify-content: end;
-      align-items: center;
-      gap: 8px;
-      height: 100%;
-    }
-    .bar {
-      width: 100%;
-      max-width: 68px;
-      border-radius: 18px 18px 8px 8px;
-      background: linear-gradient(180deg, #e88972 0%, var(--accent) 100%);
-      min-height: 4px;
-      position: relative;
-      overflow: hidden;
-    }
-    .bar::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.28), transparent 46%);
-    }
-    .bar-col .day { font-size: 12px; color: var(--muted); text-align: center; }
-    .bar-col .num { font-size: 12px; font-weight: 600; }
-
-    .line-chart-wrap { position: relative; height: 190px; margin-top: 8px; }
-    .line-chart-wrap.tall { height: 210px; }
-    .line-chart-wrap canvas { width: 100%; height: 100%; }
-
-    .table { width: 100%; border-collapse: collapse; }
-    .table th, .table td {
-      padding: 11px 0;
-      text-align: left;
-      border-bottom: 1px solid rgba(118, 106, 93, 0.12);
-      font-size: 14px;
-      vertical-align: top;
-    }
-    .table th { color: var(--muted); font-weight: 500; }
-    .table tr.clickable { cursor: pointer; transition: background 0.15s; }
-    .table tr.clickable:hover { background: rgba(63, 125, 107, 0.06); }
-
-    .empty { color: var(--muted); font-size: 14px; padding: 20px 0 6px; }
-
-    .insight-list {
-      display: grid;
-      gap: 12px;
-    }
-    .insight-item {
-      padding: 16px;
-      border-radius: 18px;
-      background: rgba(118, 106, 93, 0.05);
-      border: 1px solid rgba(118, 106, 93, 0.08);
-    }
-    .insight-item.clickable { cursor: pointer; }
-    .insight-item.clickable:hover { background: rgba(63, 125, 107, 0.06); }
-    .insight-item.good { border-color: rgba(63, 125, 107, 0.18); }
-    .insight-item.notice { border-color: rgba(74, 127, 196, 0.18); }
-    .insight-item.warn { border-color: rgba(211, 93, 71, 0.18); }
-    .insight-level {
-      display: inline-block;
-      margin-bottom: 8px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .insight-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
-    .insight-detail { color: var(--muted); font-size: 13px; line-height: 1.6; }
-
-    .workout-highlight {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .highlight-card {
-      padding: 14px;
-      border-radius: 18px;
-      background: rgba(118, 106, 93, 0.05);
-    }
-    .highlight-card .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-    .highlight-card .value { font-size: 20px; font-weight: 700; }
-    .highlight-card .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
-
-    .device-list {
-      display: grid;
-      gap: 10px;
-    }
-    .device-item {
-      padding: 14px 16px;
-      border-radius: 18px;
-      background: rgba(118, 106, 93, 0.05);
-    }
-    .device-item .top {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 6px;
-    }
-    .device-item .name { font-weight: 700; font-size: 14px; }
-    .device-item .meta { color: var(--muted); font-size: 13px; line-height: 1.5; }
-
-    .ai-controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 14px;
-    }
-    .ai-controls select,
-    .ai-controls button {
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 13px;
-    }
-    .ai-controls select {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.75);
-      color: var(--text);
-      min-width: 220px;
-    }
-    .ai-controls button {
-      border: none;
-      background: var(--text);
-      color: #fff;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .ai-controls button:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-    .ai-meta {
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 12px;
-      line-height: 1.6;
-    }
-    .ai-card {
-      padding: 16px;
-      border-radius: 18px;
-      background: rgba(118, 106, 93, 0.05);
-      border: 1px solid rgba(118, 106, 93, 0.08);
-    }
-    .ai-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      letter-spacing: -0.02em;
-    }
-    .ai-summary {
-      color: var(--text);
-      font-size: 14px;
-      line-height: 1.7;
-      margin-bottom: 14px;
-    }
-    .ai-section { margin-top: 12px; }
-    .ai-section .label {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .ai-section ul {
-      padding-left: 18px;
-      color: var(--text);
-      font-size: 14px;
-      line-height: 1.7;
-    }
-    .ai-section li + li { margin-top: 4px; }
-    .ai-history {
-      display: grid;
-      gap: 8px;
-      margin-top: 14px;
-    }
-    .ai-history-item {
-      padding: 12px 14px;
-      border-radius: 14px;
-      background: rgba(118, 106, 93, 0.05);
-      border: 1px solid rgba(118, 106, 93, 0.08);
-      cursor: pointer;
-    }
-    .ai-history-item:hover {
-      background: rgba(63, 125, 107, 0.06);
-    }
-    .ai-history-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-    .ai-history-title {
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.4;
-    }
-    .ai-history-meta,
-    .ai-history-summary {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      background: rgba(47, 38, 29, 0.4);
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-    }
-    .modal-overlay.open { opacity: 1; pointer-events: auto; }
-
-    .modal-box {
-      background: var(--panel);
-      border-radius: 24px;
-      box-shadow: 0 40px 80px rgba(47, 38, 29, 0.2);
-      width: min(92vw, 820px);
-      max-height: 88vh;
-      overflow-y: auto;
-      padding: 28px;
-      transform: translateY(20px);
-      transition: transform 0.25s;
-    }
-    .modal-overlay.open .modal-box { transform: translateY(0); }
-
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 20px;
-    }
-    .modal-header h2 { font-size: 24px; letter-spacing: -0.03em; }
-    .modal-header .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
-    .modal-close {
-      border: none;
-      background: none;
-      font-size: 28px;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 0 4px;
-      line-height: 1;
-    }
-    .modal-close:hover { color: var(--text); }
-
-    .modal-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    .modal-stat {
-      background: rgba(118, 106, 93, 0.05);
-      border-radius: 14px;
-      padding: 14px;
-    }
-    .modal-stat .label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
-    .modal-stat .val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
-
-    .modal-chart { position: relative; height: 220px; margin-top: 12px; }
-    .modal-chart canvas { width: 100%; height: 100%; }
-
-    .date-range {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .date-range button {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: transparent;
-      color: var(--muted);
-      padding: 6px 12px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .date-range button.active {
-      background: var(--text);
-      color: white;
-      border-color: var(--text);
-    }
-
-    @media (max-width: 1040px) {
-      .hero, .content-grid { grid-template-columns: 1fr; }
-      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-    @media (max-width: 720px) {
-      .metric-grid { grid-template-columns: 1fr; }
-      .signal-grid { grid-template-columns: 1fr; }
-      .workout-highlight { grid-template-columns: 1fr; }
-      .hero-main, .hero-side, .chart-panel, .table-panel, .insight-panel { padding: 20px; }
-    }
-  </style>
+  <title>myAppleHealthy Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/dashboard/styles.css">
 </head>
-<body>
-<div class="shell">
-  <section class="hero">
-    <div class="panel hero-main">
-      <div class="eyebrow">今日概览</div>
-      <div id="heroBadge" class="hero-badge neutral">正在分析今天状态</div>
-      <h1 id="heroTitle">今天的健康状态</h1>
-      <p id="heroDesc">加载中…</p>
-      <div id="heroSignals" class="signal-grid"></div>
-      <div class="toolbar">
-        <button id="reloadBtn">刷新</button>
-        <span id="apiHint" class="hint"></span>
-      </div>
-    </div>
-    <div class="panel hero-side">
-      <div>
-        <div class="eyebrow">最近同步</div>
-        <div id="backendStatus" class="status"><span class="dot"></span><span>读取中…</span></div>
-      </div>
-      <div id="focusList" class="focus-list"></div>
-    </div>
-  </section>
+<body class="is-loading">
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
 
-  <section class="metric-grid">
-    <div class="panel metric-card clickable" data-metric="steps">
-      <div class="label">今日步数</div>
-      <div id="todaySteps" class="value">-</div>
-      <div id="todayStepsSub" class="sub">-</div>
-    </div>
-    <div class="panel metric-card clickable" data-metric="hr">
-      <div class="label">今日心率</div>
-      <div id="todayHR" class="value">-</div>
-      <div id="todayHRSub" class="sub">-</div>
-    </div>
-    <div class="panel metric-card clickable" id="sleepCard" data-metric="sleep">
-      <div class="label">近 7 晚睡眠</div>
-      <div id="sleep7d" class="value">-</div>
-      <div id="sleep7dSub" class="sub">-</div>
-    </div>
-    <div class="panel metric-card clickable" data-metric="sync">
-      <div class="label">数据新鲜度</div>
-      <div id="syncFreshness" class="value">-</div>
-      <div id="syncFreshnessSub" class="sub">-</div>
-    </div>
-  </section>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="eyebrow">myAppleHealthy</div>
+        <h1 id="currentGreeting">健康概览</h1>
+        <p id="currentDateLabel" class="muted-line">正在读取今天的数据窗口</p>
+      </div>
+      <div class="topbar-actions">
+        <div id="backendStatus" class="status-pill" data-skeleton>
+          <span class="status-dot"></span>
+          <span>正在连接服务端</span>
+        </div>
+        <button id="themeToggle" class="ghost-button" type="button">切换主题</button>
+        <button id="reloadBtn" class="primary-button" type="button">刷新</button>
+      </div>
+    </header>
 
-  <section class="content-grid">
-    <div class="stack">
-      <div class="panel chart-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">近 7 天步数</h2>
-            <div class="panel-subtitle" id="stepsSummary">近期活动强度对比</div>
+    <section id="overview" class="hero panel">
+      <div class="hero-copy">
+        <div id="heroBadge" class="hero-badge neutral" data-skeleton>正在判断今天状态</div>
+        <h2 id="heroTitle" data-skeleton>今天的健康状态</h2>
+        <p id="heroDesc" class="hero-desc" data-skeleton>首页会把睡眠、活动、心率和同步新鲜度合并成一个更紧凑的信号面板。</p>
+      </div>
+      <div class="hero-meta">
+        <div class="hero-meta-card">
+          <div class="mini-label">数据刷新</div>
+          <div id="apiHint" class="mini-value" data-skeleton>等待同步数据</div>
+        </div>
+        <div class="hero-meta-card">
+          <div class="mini-label">健康评分</div>
+          <div id="healthScoreValue" class="mini-value" data-skeleton>--</div>
+        </div>
+        <div class="hero-meta-card">
+          <div class="mini-label">主同步设备</div>
+          <div id="primaryDeviceLabel" class="mini-value" data-skeleton>主 iPhone</div>
+        </div>
+      </div>
+      <div id="heroSignals" class="signal-grid">
+        <article class="signal-card neutral skeleton-card" data-skeleton></article>
+        <article class="signal-card neutral skeleton-card" data-skeleton></article>
+        <article class="signal-card neutral skeleton-card" data-skeleton></article>
+        <article class="signal-card neutral skeleton-card" data-skeleton></article>
+      </div>
+    </section>
+
+    <section id="focusList" class="focus-strip">
+      <article class="focus-chip" data-skeleton></article>
+      <article class="focus-chip" data-skeleton></article>
+      <article class="focus-chip" data-skeleton></article>
+      <article class="focus-chip" data-skeleton></article>
+    </section>
+
+    <section class="metric-grid">
+      <article class="panel metric-card clickable" data-metric="steps">
+        <div class="metric-label">今日步数</div>
+        <div id="todaySteps" class="metric-value" data-skeleton>-</div>
+        <div id="todayStepsSub" class="metric-sub" data-skeleton>等待同步</div>
+      </article>
+      <article class="panel metric-card clickable" data-metric="hr">
+        <div class="metric-label">今日心率</div>
+        <div id="todayHR" class="metric-value" data-skeleton>-</div>
+        <div id="todayHRSub" class="metric-sub" data-skeleton>等待同步</div>
+      </article>
+      <article class="panel metric-card clickable" data-metric="sleep">
+        <div class="metric-label">近 7 晚睡眠</div>
+        <div id="sleep7d" class="metric-value" data-skeleton>-</div>
+        <div id="sleep7dSub" class="metric-sub" data-skeleton>等待同步</div>
+      </article>
+      <article class="panel metric-card clickable" data-metric="sync">
+        <div class="metric-label">数据新鲜度</div>
+        <div id="syncFreshness" class="metric-value" data-skeleton>-</div>
+        <div id="syncFreshnessSub" class="metric-sub" data-skeleton>等待同步</div>
+      </article>
+    </section>
+
+    <main class="content-grid">
+      <div id="trends" class="column-main">
+        <section class="panel chart-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Movement</div>
+              <h3>近 7 天步数</h3>
+              <p id="stepsSummary" class="panel-subtitle" data-skeleton>近期活动强度对比</p>
+            </div>
+            <span class="tag tag-blue">7 天</span>
           </div>
-          <span class="pill red">近 7 天</span>
-        </div>
-        <div id="stepsChart" class="bars"></div>
+          <div class="chart-shell compact">
+            <canvas id="stepsCanvas"></canvas>
+          </div>
+        </section>
+
+        <section class="panel chart-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Recovery</div>
+              <h3>近 14 晚睡眠结构</h3>
+              <p id="sleepSummary" class="panel-subtitle" data-skeleton>深睡、浅睡、REM 和清醒时间</p>
+            </div>
+            <span class="tag tag-emerald">Sleep</span>
+          </div>
+          <div class="chart-shell">
+            <canvas id="sleepCanvas"></canvas>
+          </div>
+        </section>
+
+        <section class="panel chart-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Cardio</div>
+              <h3>近 30 天心率趋势</h3>
+              <p id="hrSummary" class="panel-subtitle" data-skeleton>平均值叠加每日区间波动</p>
+            </div>
+            <span class="tag tag-orange">Heart</span>
+          </div>
+          <div class="chart-shell">
+            <canvas id="hrCanvas"></canvas>
+          </div>
+        </section>
       </div>
 
-      <div class="panel chart-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">近 14 晚睡眠</h2>
-            <div class="panel-subtitle" id="sleepSummary">最近两周的睡眠时长变化</div>
+      <aside id="coach" class="column-side">
+        <section class="panel ai-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">AI Brief</div>
+              <h3>智能总结</h3>
+              <p class="panel-subtitle">根据最近的睡眠、活动、心率和同步新鲜度生成简报。</p>
+            </div>
+            <span class="tag tag-blue">AI</span>
           </div>
-          <span class="pill blue">睡眠</span>
-        </div>
-        <div class="line-chart-wrap">
-          <canvas id="sleepCanvas"></canvas>
-        </div>
-      </div>
+          <div class="ai-controls">
+            <select id="aiModelSelect"></select>
+            <button id="aiAnalyzeBtn" class="primary-button" type="button">生成总结</button>
+            <button id="aiRefreshBtn" class="ghost-button" type="button">重新生成</button>
+          </div>
+          <div id="aiMeta" class="ai-meta" data-skeleton>准备中…</div>
+          <div id="aiPanel" class="ai-card">
+            <div class="empty-state">还没有生成 AI 总结。完成一次同步后再生成，会更准确。</div>
+          </div>
+          <div id="aiHistory" class="history-list">
+            <div class="empty-state">还没有最近总结。</div>
+          </div>
+        </section>
 
-      <div class="panel chart-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">近 30 天心率趋势</h2>
-            <div class="panel-subtitle" id="hrSummary">每日平均 / 最低 / 最高</div>
+        <section class="panel insight-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Highlights</div>
+              <h3>近期提醒</h3>
+              <p class="panel-subtitle">优先显示最近值得继续观察的变化，而不是全量原始指标。</p>
+            </div>
+            <span class="tag tag-gold">Alert</span>
           </div>
-          <span class="pill">心率</span>
-        </div>
-        <div class="line-chart-wrap tall">
-          <canvas id="hrCanvas"></canvas>
-        </div>
-      </div>
-    </div>
+          <div id="insights" class="insight-list">
+            <div class="insight-item skeleton-card" data-skeleton></div>
+            <div class="insight-item skeleton-card" data-skeleton></div>
+          </div>
+        </section>
 
-    <div class="stack">
-      <div class="panel insight-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">智能总结</h2>
-            <div class="panel-subtitle">根据最近的数据，整理一份简短总结和接下来值得关注的点。</div>
+        <section class="panel table-panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-kicker">Training</div>
+              <h3>最近训练</h3>
+              <p class="panel-subtitle">最近一次训练和 7/30 天训练密度。</p>
+            </div>
+            <span class="tag tag-orange">Workout</span>
           </div>
-          <span class="pill blue">总结</span>
-        </div>
-        <div class="ai-controls">
-          <select id="aiModelSelect"></select>
-          <button id="aiAnalyzeBtn">生成总结</button>
-          <button id="aiRefreshBtn">重新生成</button>
-        </div>
-        <div id="aiMeta" class="ai-meta">准备中…</div>
-        <div id="aiPanel" class="ai-card">
-          <div class="empty">还没有生成 AI 总结。完成一次同步后再生成，会更准确。</div>
-        </div>
-        <div id="aiHistory" class="ai-history">
-          <div class="empty">还没有最近总结。</div>
-        </div>
-      </div>
+          <div id="workoutHighlight" class="summary-grid">
+            <div class="summary-card" data-skeleton></div>
+            <div class="summary-card" data-skeleton></div>
+            <div class="summary-card" data-skeleton></div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>日期</th><th>类型</th><th>时长</th><th>消耗</th></tr>
+            </thead>
+            <tbody id="recentWorkoutTable"></tbody>
+          </table>
+        </section>
+      </aside>
+    </main>
 
-      <div class="panel insight-panel">
-        <div class="panel-header">
+    <section id="sync" class="lower-grid">
+      <section class="panel table-panel">
+        <div class="panel-head">
           <div>
-            <h2 class="panel-title">近期提醒</h2>
-            <div class="panel-subtitle">这里会提示最近值得关注的变化。</div>
+            <div class="panel-kicker">Coverage</div>
+            <h3>近期活跃维度</h3>
+            <p class="panel-subtitle">最近 7 天更新比较频繁的记录类型。</p>
           </div>
-          <span class="pill warn">提醒</span>
+          <span class="tag tag-emerald">Types</span>
         </div>
-        <div id="insights" class="insight-list"></div>
-      </div>
-
-      <div class="panel table-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">最近训练</h2>
-            <div class="panel-subtitle">用最近 30 天训练频率和最近一次训练描述当前状态。</div>
-          </div>
-          <span class="pill red">训练</span>
-        </div>
-        <div id="workoutHighlight" class="workout-highlight"></div>
-        <table class="table">
-          <thead><tr><th>日期</th><th>类型</th><th>时长</th><th>消耗</th></tr></thead>
-          <tbody id="recentWorkoutTable"></tbody>
-        </table>
-      </div>
-
-      <div class="panel table-panel">
-        <div class="panel-header">
-          <div>
-            <h2 class="panel-title">近期活跃维度</h2>
-            <div class="panel-subtitle">最近更新比较频繁的几个维度。</div>
-          </div>
-          <span class="pill">维度</span>
-        </div>
-        <table class="table">
-          <thead><tr><th>维度</th><th>7天记录数</th><th>最近更新</th></tr></thead>
+        <table class="data-table">
+          <thead>
+            <tr><th>维度</th><th>7 天记录数</th><th>最近更新</th></tr>
+          </thead>
           <tbody id="typesTable"></tbody>
         </table>
-      </div>
+      </section>
 
-      <div class="panel table-panel">
-        <div class="panel-header">
+      <section class="panel table-panel">
+        <div class="panel-head">
           <div>
-            <h2 class="panel-title">同步与设备</h2>
-            <div class="panel-subtitle">确认数据是否保持最新，并查看最近自动同步记录。</div>
+            <div class="panel-kicker">Sync</div>
+            <h3>主同步设备</h3>
+            <p class="panel-subtitle">默认按单设备场景展示主设备状态，并保留最近自动同步记录。</p>
           </div>
-          <span class="pill blue">同步</span>
+          <span class="tag tag-blue">Primary</span>
         </div>
-        <div id="deviceList" class="device-list"></div>
-        <table class="table" style="margin-top:16px;">
-          <thead><tr><th>最近自动同步记录</th><th>时间</th><th>接受</th></tr></thead>
+        <div id="deviceList" class="device-stack">
+          <div class="device-hero" data-skeleton></div>
+        </div>
+        <table class="data-table top-gap">
+          <thead>
+            <tr><th>最近自动同步记录</th><th>时间</th><th>接受</th></tr>
+          </thead>
           <tbody id="syncEventTable"></tbody>
         </table>
-      </div>
-    </div>
-  </section>
-</div>
+      </section>
+    </section>
 
-<div class="modal-overlay" id="typeModal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <div>
-        <h2 id="modalTitle">-</h2>
-        <div class="sub" id="modalSub">-</div>
+    <section class="analysis-grid">
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Sleep Quality</div>
+            <h3>睡眠质量概览</h3>
+            <p id="sleepQualitySummary" class="panel-subtitle" data-skeleton>最近几晚的质量评分、效率和阶段占比。</p>
+          </div>
+          <span class="tag tag-emerald">Score</span>
+        </div>
+        <div id="sleepQualityCards" class="summary-grid">
+          <div class="summary-card" data-skeleton></div>
+          <div class="summary-card" data-skeleton></div>
+          <div class="summary-card" data-skeleton></div>
+        </div>
+        <div class="chart-shell compact">
+          <canvas id="sleepQualityCanvas"></canvas>
+        </div>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-kicker">Weekly Load</div>
+            <h3>训练周报</h3>
+            <p id="workoutWeeklySummary" class="panel-subtitle" data-skeleton>按周聚合训练次数、时长和热度。</p>
+          </div>
+          <span class="tag tag-orange">12 周</span>
+        </div>
+        <div id="workoutWeeklyCards" class="summary-grid">
+          <div class="summary-card" data-skeleton></div>
+          <div class="summary-card" data-skeleton></div>
+          <div class="summary-card" data-skeleton></div>
+        </div>
+        <div class="chart-shell compact">
+          <canvas id="workoutWeeklyCanvas"></canvas>
+        </div>
+      </section>
+    </section>
+
+    <section id="routes" class="panel route-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-kicker">Route Replay</div>
+          <h3>最近运动路线</h3>
+          <p id="routeSummary" class="panel-subtitle" data-skeleton>读取最近带 GPS 轨迹的训练，直接看地图而不是只看数字。</p>
+        </div>
+        <span class="tag tag-blue">Map</span>
       </div>
-      <button class="modal-close" id="modalClose">&times;</button>
-    </div>
-    <div class="date-range" id="modalRange">
-      <button data-days="7">7天</button>
-      <button data-days="30" class="active">30天</button>
-      <button data-days="90">90天</button>
-      <button data-days="365">1年</button>
-      <button data-days="0">全部</button>
-    </div>
-    <div class="date-range" id="modalHourlyDate" style="display:none">
-      <button id="modalDatePrev">‹ 前一天</button>
-      <span id="modalDateLabel" style="padding:0 14px;font-size:14px;color:var(--text)">今天</span>
-      <button id="modalDateNext" disabled>后一天 ›</button>
-    </div>
-    <div class="modal-stats" id="modalStats"></div>
-    <div class="modal-chart">
-      <canvas id="modalCanvas"></canvas>
+      <div class="route-toolbar">
+        <select id="routeSelect" class="route-select">
+          <option>正在读取路线…</option>
+        </select>
+        <div id="routeMeta" class="panel-subtitle">优先展示最近一条带路线的训练。</div>
+      </div>
+      <div id="routeCards" class="summary-grid">
+        <div class="summary-card" data-skeleton></div>
+        <div class="summary-card" data-skeleton></div>
+        <div class="summary-card" data-skeleton></div>
+      </div>
+      <div class="route-layout">
+        <div id="routeMap" class="route-map" aria-label="运动路线地图"></div>
+        <div id="routeList" class="route-list">
+          <div class="empty-state">正在读取路线列表…</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <nav class="mobile-nav">
+    <a href="#overview">概览</a>
+    <a href="#trends">趋势</a>
+    <a href="#coach">总结</a>
+    <a href="#routes">路线</a>
+    <a href="#sync">同步</a>
+  </nav>
+
+  <div class="modal-overlay" id="typeModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div class="panel-kicker">Detail</div>
+          <h2 id="modalTitle">-</h2>
+          <div id="modalSub" class="panel-subtitle">-</div>
+        </div>
+        <button id="modalClose" class="modal-close" type="button" aria-label="关闭">&times;</button>
+      </div>
+      <div class="modal-toolbar">
+        <div class="range-group" id="modalRange">
+          <button data-days="7" type="button">7天</button>
+          <button data-days="30" class="active" type="button">30天</button>
+          <button data-days="90" type="button">90天</button>
+          <button data-days="365" type="button">1年</button>
+          <button data-days="0" type="button">全部</button>
+        </div>
+        <div class="range-group" id="modalHourlyDate" hidden>
+          <button id="modalDatePrev" type="button">‹ 前一天</button>
+          <span id="modalDateLabel" class="date-pill">今天</span>
+          <button id="modalDateNext" type="button" disabled>后一天 ›</button>
+        </div>
+      </div>
+      <div id="modalStats" class="modal-stats"></div>
+      <div class="chart-shell modal-chart">
+        <canvas id="modalCanvas"></canvas>
+      </div>
     </div>
   </div>
-</div>
 
-<script>
-const fmtInt = new Intl.NumberFormat("zh-CN");
-const BASE = window.location.origin;
-const dashboardState = { home: null, aiReports: [], deviceSyncState: null };
-const MODEL_LABELS = {
-  "minimax/minimax-m2.7": "MiniMax M2.7",
-  "anthropic/claude-sonnet-4.6": "Claude Sonnet 4.6",
-};
-
-function shortDate(v) { return v ? String(v).slice(5, 10) : "-"; }
-function shortDateTime(v) { return v ? String(v).replace("T", " ").slice(0, 16) : "-"; }
-function parseDateOnly(v) { return new Date(`${v}T12:00:00`); }
-function formatLocalDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-function dateDaysAgo(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return formatLocalDate(d);
-}
-function todayStr() { return formatLocalDate(new Date()); }
-
-function fmtNum(v) {
-  if (v == null || Number.isNaN(Number(v))) return "-";
-  const n = Number(v);
-  if (Math.abs(n) >= 1000) return fmtInt.format(Math.round(n));
-  if (Math.abs(n) >= 100) return n.toFixed(0);
-  if (Math.abs(n) >= 10) return n.toFixed(1);
-  return n.toFixed(2);
-}
-
-function fmtHours(v) {
-  if (v == null) return "-";
-  return `${Number(v).toFixed(1)} 小时`;
-}
-
-function humanMinutes(m) {
-  if (m == null) return "-";
-  m = Number(m);
-  if (m < 60) return `${Math.round(m)} 分钟`;
-  return `${(m / 60).toFixed(1)} 小时`;
-}
-
-function humanFreshness(hours) {
-  if (hours == null) return "未同步";
-  if (hours < 1) return "刚同步";
-  if (hours < 24) return `${hours.toFixed(1)}h`;
-  return `${(hours / 24).toFixed(1)}d`;
-}
-
-function displayDeviceName(id) {
-  const text = String(id || "").trim();
-  if (!text) return "未知设备";
-  const lower = text.toLowerCase();
-  if (lower.includes("iphone")) return "iPhone";
-  if (lower.includes("watch")) return "Apple Watch";
-  return text.length > 24 ? `${text.slice(0, 24)}…` : text;
-}
-
-function humanSyncStatus(status) {
-  const value = String(status || "").trim().toLowerCase();
-  if (!value) return "状态未知";
-  if (["ok", "success", "completed"].includes(value)) return "同步正常";
-  if (value === "running") return "同步中";
-  if (value === "failed") return "同步失败";
-  if (value === "stalled") return "等待处理";
-  if (value === "partial") return "部分完成";
-  if (value === "idle") return "等待同步";
-  return String(status);
-}
-
-function deltaText(v, positiveLabel = "较前期上升", negativeLabel = "较前期下降") {
-  if (v == null) return "暂无可比数据";
-  if (Math.abs(v) < 0.1) return "与前期基本持平";
-  return `${v > 0 ? positiveLabel : negativeLabel} ${Math.abs(v).toFixed(1)}%`;
-}
-
-function average(values) {
-  const nums = values.filter(v => v != null && !Number.isNaN(Number(v))).map(Number);
-  if (!nums.length) return null;
-  return nums.reduce((sum, value) => sum + value, 0) / nums.length;
-}
-
-function timeAwareStepTarget(avg7d) {
-  const now = new Date();
-  const hours = now.getHours() + now.getMinutes() / 60;
-  const progress = Math.min(1, Math.max(0.18, (hours - 6) / 16));
-  const baseline = avg7d && avg7d > 0 ? avg7d : 7000;
-  return Math.max(2200, baseline * progress);
-}
-
-function signalClass(level) {
-  if (level === "good") return "good";
-  if (level === "warn") return "warn";
-  if (level === "bad") return "bad";
-  return "neutral";
-}
-
-function assessSleepSignal(home) {
-  const last = Number(home.sleep.last_night_hours || 0);
-  if (!last) {
-    return { key: "sleep", label: "昨晚睡眠", level: "neutral", value: "暂无数据", note: "同步到睡眠记录后再判断。" };
-  }
-  const avg7 = Number(home.sleep.avg_7d || 0);
-  let level = "good";
-  let note = "昨晚睡得还可以。";
-  if (last < 5.5 || (avg7 && last < avg7 - 1.2)) {
-    level = "bad";
-    note = "昨晚偏短，今天优先补恢复。";
-  } else if (last < 6.5 || (avg7 && last < avg7 - 0.5)) {
-    level = "warn";
-    note = "稍微有点少，今天节奏可以轻一点。";
-  }
-  return {
-    key: "sleep",
-    label: "昨晚睡眠",
-    level,
-    value: fmtHours(last),
-    note,
-  };
-}
-
-function assessActivitySignal(home) {
-  const today = Number(home.today.steps || 0);
-  const target = timeAwareStepTarget(Number(home.steps.avg_7d || 0));
-  let level = "good";
-  let note = "按当前时间看，活动进度不错。";
-  if (today < target * 0.75) {
-    level = "bad";
-    note = "今天活动偏少，晚些时候可以补一段走路。";
-  } else if (today < target * 1.05) {
-    level = "warn";
-    note = "活动量还可以，再走一点会更稳。";
-  }
-  return {
-    key: "activity",
-    label: "今日活动",
-    level,
-    value: `${fmtInt.format(today)} 步`,
-    note,
-  };
-}
-
-function assessHeartSignal(home) {
-  const hr = home.today.heart_rate || {};
-  if (hr.avg == null || Number(hr.count || 0) < 40) {
-    return { key: "heart", label: "心率记录", level: "neutral", value: "数据较少", note: "今天的心率记录还不够完整。" };
-  }
-  const baseline = average((home.heart_rate.last_30_days || []).slice(-7).map(item => item.avg_bpm));
-  const delta = baseline == null ? null : Math.abs(Number(hr.avg) - baseline);
-  let level = "good";
-  let note = "和最近几天相比波动不大。";
-  if (Number(hr.avg) >= 95 || Number(hr.max) >= 160 || (delta != null && delta > 12)) {
-    level = "bad";
-    note = "今天心率比近期偏高，先别把节奏拉太满。";
-  } else if (Number(hr.avg) >= 88 || Number(hr.max) >= 145 || (delta != null && delta > 7)) {
-    level = "warn";
-    note = "比近期略高一点，可以继续观察。";
-  }
-  return {
-    key: "heart",
-    label: "心率波动",
-    level,
-    value: `${fmtNum(hr.avg)} bpm`,
-    note,
-  };
-}
-
-function assessSyncSignal(home) {
-  const hours = home.sync.hours_since_last_sync;
-  if (hours == null) {
-    return { key: "sync", label: "数据同步", level: "bad", value: "尚未同步", note: "还没有拿到最近数据，今天判断会偏弱。" };
-  }
-  let level = "good";
-  let note = "记录是新的，可以放心看今天状态。";
-  if (hours > 24) {
-    level = "bad";
-    note = "同步有点旧，今天的结论只能作参考。";
-  } else if (hours > 8) {
-    level = "warn";
-    note = "不是最新一轮数据，判断会稍微滞后。";
-  }
-  return {
-    key: "sync",
-    label: "数据同步",
-    level,
-    value: humanFreshness(hours),
-    note,
-  };
-}
-
-function assessTodayStatus(home) {
-  const signals = [
-    assessSleepSignal(home),
-    assessActivitySignal(home),
-    assessHeartSignal(home),
-    assessSyncSignal(home),
-  ];
-  const counts = {
-    bad: signals.filter(item => item.level === "bad").length,
-    warn: signals.filter(item => item.level === "warn").length,
-    good: signals.filter(item => item.level === "good").length,
-  };
-  let overall = { level: "good", title: "今天状态不错", desc: "睡眠、活动和记录完整度都还不错。" };
-  if (signals.find(item => item.key === "sleep" && item.level === "bad")) {
-    overall = { level: "bad", title: "今天先补恢复", desc: "昨晚睡眠偏短，今天可以把节奏放轻一点。" };
-  } else if (counts.bad >= 2) {
-    overall = { level: "bad", title: "今天有点偏紧", desc: "有不止一个维度亮了红灯，今天更适合保守一点。" };
-  } else if (counts.bad === 1) {
-    const focus = signals.find(item => item.level === "bad");
-    overall = { level: "warn", title: "今天有一个重点要留意", desc: focus ? focus.note : "今天有一个维度偏弱，先看红灯项。" };
-  } else if (counts.warn >= 2) {
-    overall = { level: "warn", title: "今天状态一般", desc: "整体还算稳定，但有几个维度只是勉强过线。" };
-  } else if (counts.good >= 3) {
-    overall = { level: "good", title: "今天状态不错", desc: "睡眠、活动和同步都比较稳，可以按正常节奏走。" };
-  } else {
-    overall = { level: "warn", title: "今天状态平稳", desc: "没有明显问题，但也不算特别轻松。" };
-  }
-  return { overall, signals };
-}
-
-function rangeText(start, end) {
-  if (!start || !end) return "-";
-  return `${String(start).slice(11, 16)} - ${String(end).slice(11, 16)}`;
-}
-
-const TYPE_NAMES = {
-  StepCount: "步数", HeartRate: "心率", ActiveEnergyBurned: "活动能量",
-  BasalEnergyBurned: "基础代谢", DistanceWalkingRunning: "步行+跑步距离",
-  FlightsClimbed: "爬楼层数", AppleExerciseTime: "锻炼时间",
-  AppleStandTime: "站立时间", HeartRateVariabilitySDNN: "心率变异性",
-  RestingHeartRate: "静息心率", WalkingHeartRateAverage: "步行平均心率",
-  OxygenSaturation: "血氧饱和度", RespiratoryRate: "呼吸频率",
-  BodyMass: "体重", Height: "身高", BodyFatPercentage: "体脂率",
-  BodyMassIndex: "BMI", LeanBodyMass: "去脂体重",
-  VO2Max: "最大摄氧量", BodyTemperature: "体温",
-  DistanceCycling: "骑行距离", DistanceSwimming: "游泳距离",
-  SwimmingStrokeCount: "游泳划水次数", RunningSpeed: "跑步速度",
-  RunningPower: "跑步功率", RunningStrideLength: "跑步步幅",
-  RunningGroundContactTime: "触地时间", RunningVerticalOscillation: "垂直振幅",
-  WalkingSpeed: "步行速度", WalkingStepLength: "步行步幅",
-  WalkingAsymmetryPercentage: "步行不对称", WalkingDoubleSupportPercentage: "双脚支撑",
-  AppleWalkingSteadiness: "步行稳定性", EnvironmentalAudioExposure: "环境音量",
-  HeadphoneAudioExposure: "耳机音量", SixMinuteWalkTestDistance: "6分钟步行距离",
-  PhysicalEffort: "体力消耗", TimeInDaylight: "日光时间",
-  AppleSleepingWristTemperature: "睡眠腕温", HeartRateRecoveryOneMinute: "心率恢复(1分钟)",
-  AtrialFibrillationBurden: "房颤负担", DistanceWheelchair: "轮椅距离",
-  DistanceDownhillSnowSports: "滑雪距离", PushCount: "推动次数",
-  SleepAnalysis: "睡眠分析", AudioExposureEvent: "音频暴露事件",
-  HandwashingEvent: "洗手事件", HighHeartRateEvent: "高心率事件",
-  LowHeartRateEvent: "低心率事件", IrregularHeartRhythmEvent: "心律不齐事件",
-  LowCardioFitnessEvent: "低心肺事件",
-};
-
-function shortType(t) {
-  const key = (t || "")
-    .replace("HKQuantityTypeIdentifier", "")
-    .replace("HKCategoryTypeIdentifier", "")
-    .replace("HKDataType", "");
-  return TYPE_NAMES[key] || key || "-";
-}
-
-const ACTIVITY_NAMES = {
-  Running: "跑步", Walking: "步行", Cycling: "骑行", Swimming: "游泳",
-  Hiking: "徒步", Yoga: "瑜伽", FunctionalStrengthTraining: "力量训练",
-  TraditionalStrengthTraining: "传统力量训练", HighIntensityIntervalTraining: "HIIT",
-  Dance: "舞蹈", Elliptical: "椭圆机", Rowing: "划船", Stairmaster: "爬楼机",
-  CoreTraining: "核心训练", Flexibility: "柔韧训练", MindAndBody: "身心训练",
-  Pilates: "普拉提", TableTennis: "乒乓球", Badminton: "羽毛球",
-  Tennis: "网球", Basketball: "篮球", Soccer: "足球", Volleyball: "排球",
-  Golf: "高尔夫", Baseball: "棒球", Softball: "垒球", MartialArts: "武术",
-  Boxing: "拳击", Kickboxing: "跆拳道", Climbing: "攀岩", Skiing: "滑雪",
-  Snowboarding: "单板滑雪", Surfing: "冲浪", WaterPolo: "水球",
-  Skateboarding: "滑板", JumpRope: "跳绳", Cooldown: "放松整理", Other: "其他",
-};
-
-function shortActivity(t) {
-  const key = (t || "").replace("HKWorkoutActivityType", "");
-  return ACTIVITY_NAMES[key] || key || "-";
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, options);
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
-  return res.json();
-}
-
-function drawLineChart(canvas, datasets, { yMin, yMax, xLabels } = {}) {
-  const ctx = canvas.getContext("2d");
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + "px";
-  canvas.style.height = rect.height + "px";
-  ctx.scale(dpr, dpr);
-  const W = rect.width, H = rect.height;
-  const pad = { top: 12, right: 14, bottom: 28, left: 42 };
-  const cw = W - pad.left - pad.right;
-  const ch = H - pad.top - pad.bottom;
-  const allVals = datasets.flatMap(d => d.values.filter(v => v != null));
-
-  if (!allVals.length) {
-    ctx.fillStyle = "#766a5d";
-    ctx.font = "14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("暂无数据", W / 2, H / 2);
-    return;
-  }
-
-  const dataMin = Math.min(...allVals);
-  const dataMax = Math.max(...allVals);
-  const autoPadding = dataMax === dataMin ? Math.max(1, dataMax * 0.1 || 1) : (dataMax - dataMin) * 0.12;
-  const yLo = yMin != null ? yMin : dataMin - autoPadding;
-  const yHi = yMax != null ? yMax : dataMax + autoPadding;
-  const yRange = yHi - yLo || 1;
-  const n = datasets[0].values.length;
-  const xStep = n > 1 ? cw / (n - 1) : cw;
-
-  function toX(i) { return pad.left + i * xStep; }
-  function toY(v) { return pad.top + ch - ((v - yLo) / yRange) * ch; }
-
-  ctx.strokeStyle = "rgba(118,106,93,0.1)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.top + (ch / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(W - pad.right, y);
-    ctx.stroke();
-    const label = (yHi - (yRange / 4) * i).toFixed(yRange > 10 ? 0 : 1);
-    ctx.fillStyle = "#766a5d";
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(label, pad.left - 6, y + 4);
-  }
-
-  if (xLabels && xLabels.length) {
-    ctx.fillStyle = "#766a5d";
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "center";
-    const step = Math.max(1, Math.floor(n / 6));
-    for (let i = 0; i < n; i += step) ctx.fillText(xLabels[i], toX(i), H - 6);
-    if ((n - 1) % step !== 0) ctx.fillText(xLabels[n - 1], toX(n - 1), H - 6);
-  }
-
-  for (const ds of datasets) {
-    const vals = ds.values;
-    if (ds.fill) {
-      ctx.beginPath();
-      let started = false;
-      for (let i = 0; i < vals.length; i++) {
-        if (vals[i] == null) continue;
-        if (!started) { ctx.moveTo(toX(i), toY(vals[i])); started = true; }
-        else ctx.lineTo(toX(i), toY(vals[i]));
-      }
-      for (let i = vals.length - 1; i >= 0; i--) {
-        if (vals[i] != null) { ctx.lineTo(toX(i), pad.top + ch); break; }
-      }
-      for (let i = 0; i < vals.length; i++) {
-        if (vals[i] != null) { ctx.lineTo(toX(i), pad.top + ch); break; }
-      }
-      ctx.closePath();
-      ctx.fillStyle = ds.fill;
-      ctx.fill();
-    }
-
-    ctx.beginPath();
-    ctx.strokeStyle = ds.color || "#d35d47";
-    ctx.lineWidth = ds.width || 2;
-    let started = false;
-    for (let i = 0; i < vals.length; i++) {
-      if (vals[i] == null) { started = false; continue; }
-      if (!started) { ctx.moveTo(toX(i), toY(vals[i])); started = true; }
-      else ctx.lineTo(toX(i), toY(vals[i]));
-    }
-    ctx.stroke();
-  }
-}
-
-function drawBarChart(canvas, slots, { color } = {}) {
-  const ctx = canvas.getContext("2d");
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + "px";
-  canvas.style.height = rect.height + "px";
-  ctx.scale(dpr, dpr);
-  const W = rect.width, H = rect.height;
-  const pad = { top: 12, right: 14, bottom: 28, left: 46 };
-  const cw = W - pad.left - pad.right;
-  const ch = H - pad.top - pad.bottom;
-
-  if (slots.every(v => !v)) {
-    ctx.fillStyle = "#766a5d";
-    ctx.font = "14px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("当日暂无数据", W / 2, H / 2);
-    return;
-  }
-
-  const maxVal = Math.max(...slots, 1);
-  const gap = cw / 24;
-  const barW = gap * 0.65;
-
-  ctx.strokeStyle = "rgba(118,106,93,0.1)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.top + (ch / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(W - pad.right, y);
-    ctx.stroke();
-    const label = (maxVal * (1 - i / 4)).toFixed(maxVal > 10 ? 0 : 1);
-    ctx.fillStyle = "#766a5d";
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(label, pad.left - 6, y + 4);
-  }
-
-  ctx.fillStyle = "#766a5d";
-  ctx.font = "11px sans-serif";
-  ctx.textAlign = "center";
-  for (const h of [0, 3, 6, 9, 12, 15, 18, 21]) {
-    ctx.fillText(`${h}`, pad.left + h * gap + gap / 2, H - 6);
-  }
-
-  for (let h = 0; h < 24; h++) {
-    const v = slots[h] || 0;
-    if (v <= 0) continue;
-    const barH = (v / maxVal) * ch;
-    const x = pad.left + h * gap + (gap - barW) / 2;
-    const y = pad.top + ch - barH;
-    ctx.fillStyle = color || "#3f7d6b";
-    ctx.globalAlpha = 0.75;
-    if (ctx.roundRect) {
-      ctx.beginPath();
-      ctx.roundRect(x, y, barW, barH, [2, 2, 0, 0]);
-      ctx.fill();
-    } else {
-      ctx.fillRect(x, y, barW, barH);
-    }
-    ctx.globalAlpha = 1;
-  }
-}
-
-function renderRows(id, rows, render, emptyCols) {
-  const el = document.getElementById(id);
-  if (!rows || !rows.length) {
-    el.innerHTML = `<tr><td colspan="${emptyCols || 4}" class="empty">暂无数据</td></tr>`;
-    return;
-  }
-  el.innerHTML = rows.map(r => `<tr>${render(r)}</tr>`).join("");
-}
-
-function renderStepsChart(items) {
-  const root = document.getElementById("stepsChart");
-  root.innerHTML = "";
-  if (!items.length) {
-    root.innerHTML = '<div class="empty">暂无步数数据</div>';
-    return;
-  }
-  const max = Math.max(...items.map(i => Number(i.steps || 0)), 1);
-  const days = ["日", "一", "二", "三", "四", "五", "六"];
-  for (const item of items) {
-    const col = document.createElement("div");
-    col.className = "bar-col";
-    const h = Math.max(6, Math.round((Number(item.steps || 0) / max) * 182));
-    const d = parseDateOnly(item.date);
-    col.innerHTML = `
-      <div class="num">${fmtInt.format(Math.round(item.steps || 0))}</div>
-      <div class="bar" style="height:${h}px"></div>
-      <div class="day">${shortDate(item.date)} 周${days[d.getDay()]}</div>
-    `;
-    root.appendChild(col);
-  }
-}
-
-function fillDailySeries(rows, days, valueKey) {
-  const map = new Map(rows.map(r => [String(r.date).slice(0, 10), r]));
-  const out = [];
-  for (let offset = days - 1; offset >= 0; offset--) {
-    const date = dateDaysAgo(offset);
-    const row = map.get(date);
-    out.push({ date, value: row && row[valueKey] != null ? Number(row[valueKey]) : null });
-  }
-  return out;
-}
-
-function renderHero(home) {
-  const assessment = assessTodayStatus(home);
-  const badge = document.getElementById("heroBadge");
-  const title = document.getElementById("heroTitle");
-  const desc = document.getElementById("heroDesc");
-  const signalsRoot = document.getElementById("heroSignals");
-  badge.className = `hero-badge ${signalClass(assessment.overall.level)}`;
-  badge.textContent = assessment.overall.level === "good"
-    ? "绿灯为主"
-    : assessment.overall.level === "bad"
-      ? "今天要多留意"
-      : "有几个黄灯";
-  title.textContent = assessment.overall.title;
-  desc.textContent = assessment.overall.desc;
-  signalsRoot.innerHTML = assessment.signals.map(item => `
-    <div class="signal-card ${signalClass(item.level)}">
-      <div class="signal-top">
-        <div class="signal-name"><span class="signal-mark"></span>${item.label}</div>
-        <div class="signal-level">${item.level === "good" ? "绿灯" : item.level === "bad" ? "红灯" : item.level === "warn" ? "黄灯" : "待补数据"}</div>
-      </div>
-      <div class="signal-value">${item.value}</div>
-      <div class="signal-detail">${item.note}</div>
-    </div>
-  `).join("");
-
-  const focus = [];
-  focus.push({
-    label: "最近一次同步",
-    value: home.sync.last_sync_at ? shortDateTime(home.sync.last_sync_at) : "还没有同步记录",
-    sub: home.sync.hours_since_last_sync == null
-      ? "同步后这里会更新。"
-      : `距现在 ${humanFreshness(home.sync.hours_since_last_sync)}`
-  });
-  focus.push({
-    label: "最近一次训练",
-    value: home.workouts.last_workout ? shortActivity(home.workouts.last_workout.activity_type) : "最近 30 天暂无训练",
-    sub: home.workouts.last_workout
-      ? `${shortDate(home.workouts.last_workout.date || home.workouts.last_workout.start_at)} · ${humanMinutes(home.workouts.last_workout.duration)}`
-      : "最近有训练后，这里会显示最近一次训练。"
-  });
-  focus.push({
-    label: "最近睡眠窗口",
-    value: home.sleep.last_night_hours != null ? fmtHours(home.sleep.last_night_hours) : "暂无睡眠数据",
-    sub: home.sleep.last_sleep_start && home.sleep.last_sleep_end
-      ? `${shortDate(home.sleep.last_sleep_end)} · ${rangeText(home.sleep.last_sleep_start, home.sleep.last_sleep_end)}`
-      : "同步到睡眠记录后，这里会显示最近一晚。"
-  });
-
-  document.getElementById("focusList").innerHTML = focus.map(item => `
-    <div class="focus-item">
-      <div class="label">${item.label}</div>
-      <div class="value">${item.value}</div>
-      <div class="sub">${item.sub}</div>
-    </div>
-  `).join("");
-}
-
-function renderMetricCards(home) {
-  const hr = home.today.heart_rate || {};
-  document.getElementById("todaySteps").textContent = fmtInt.format(home.today.steps || 0);
-  document.getElementById("todayStepsSub").textContent =
-    `近 7 天总计 ${fmtInt.format(home.steps.total_7d || 0)} · ${deltaText(home.steps.delta_vs_prev_7d, "较前 7 天上升", "较前 7 天下降")}`;
-
-  document.getElementById("todayHR").textContent = hr.avg != null ? `${fmtNum(hr.avg)}` : "-";
-  document.getElementById("todayHRSub").textContent =
-    hr.avg != null ? `${fmtNum(hr.min)} ~ ${fmtNum(hr.max)} bpm · ${hr.count || 0} 次采样` : "今日暂无心率数据";
-
-  document.getElementById("sleep7d").textContent =
-    home.sleep.avg_7d != null ? fmtHours(home.sleep.avg_7d) : "-";
-  document.getElementById("sleep7dSub").textContent =
-    `昨晚 ${home.sleep.last_night_hours != null ? fmtHours(home.sleep.last_night_hours) : "-"} · ${deltaText(home.sleep.delta_vs_prev_7d, "较前 7 晚更长", "较前 7 晚更短")}`;
-
-  document.getElementById("syncFreshness").textContent = humanFreshness(home.sync.hours_since_last_sync);
-  document.getElementById("syncFreshnessSub").textContent =
-    `今日 ${home.sync.today_sync_count || 0} 次同步 · 接受 ${fmtInt.format(home.sync.today_sync_accepted || 0)} 条`;
-}
-
-function renderStepsPanel(home) {
-  renderStepsChart(home.steps.last_7_days || []);
-  document.getElementById("stepsSummary").textContent =
-    `近 7 天日均 ${fmtInt.format(Math.round(home.steps.avg_7d || 0))} 步，${deltaText(home.steps.delta_vs_prev_7d, "比前 7 天更活跃", "比前 7 天更少活动")}`;
-}
-
-function renderSleepPanel(home) {
-  const series = fillDailySeries(home.sleep.last_14_days || [], 14, "total_hours");
-  drawLineChart(document.getElementById("sleepCanvas"), [
-    { values: series.map(d => d.value), color: "#4a7fc4", width: 2.5, fill: "rgba(74,127,196,0.1)" },
-  ], { yMin: 0, xLabels: series.map(d => shortDate(d.date)) });
-  document.getElementById("sleepSummary").textContent =
-    `近 7 晚平均 ${home.sleep.avg_7d != null ? Number(home.sleep.avg_7d).toFixed(1) : "-"} 小时，${deltaText(home.sleep.delta_vs_prev_7d, "比前 7 晚睡得更多", "比前 7 晚睡得更少")}`;
-}
-
-function renderHeartRatePanel(home) {
-  const data = fillDailySeries(home.heart_rate.last_30_days || [], 30, "avg_bpm");
-  const minSeries = fillDailySeries(home.heart_rate.last_30_days || [], 30, "min_bpm");
-  const maxSeries = fillDailySeries(home.heart_rate.last_30_days || [], 30, "max_bpm");
-  drawLineChart(document.getElementById("hrCanvas"), [
-    { values: minSeries.map(d => d.value), color: "rgba(63,125,107,0.28)", width: 1, fill: "rgba(63,125,107,0.06)" },
-    { values: maxSeries.map(d => d.value), color: "rgba(211,93,71,0.28)", width: 1, fill: "rgba(211,93,71,0.06)" },
-    { values: data.map(d => d.value), color: "#d35d47", width: 2.5 },
-  ], { xLabels: data.map(d => shortDate(d.date)) });
-  document.getElementById("hrSummary").textContent =
-    `近 7 天平均心率 ${home.heart_rate.avg_7d != null ? fmtNum(home.heart_rate.avg_7d) : "-"} bpm，${deltaText(home.heart_rate.delta_vs_prev_7d, "较前 7 天更高", "较前 7 天更低")}`;
-}
-
-function renderInsights(home) {
-  const el = document.getElementById("insights");
-  const rows = home.insights || [];
-  if (!rows.length) {
-    el.innerHTML = '<div class="empty">近期没有明显提醒，可以继续补更细的睡眠/训练建议规则。</div>';
-    return;
-  }
-  el.innerHTML = rows.map((item, idx) => `
-    <div class="insight-item ${item.level || "notice"} ${item.raw_type ? "clickable" : ""}" data-type="${item.raw_type || ""}" data-idx="${idx}">
-      <div class="insight-level">${item.level || "notice"}</div>
-      <div class="insight-title">${item.title || "-"}</div>
-      <div class="insight-detail">${item.detail || "-"}</div>
-    </div>
-  `).join("");
-  el.querySelectorAll(".insight-item.clickable").forEach(node => {
-    node.addEventListener("click", () => openTypeDetail(node.dataset.type));
-  });
-}
-
-function renderWorkouts(home) {
-  const highlight = document.getElementById("workoutHighlight");
-  const last = home.workouts.last_workout;
-  highlight.innerHTML = `
-    <div class="highlight-card">
-      <div class="label">最近一次训练</div>
-      <div class="value">${last ? shortActivity(last.activity_type) : "-"}</div>
-      <div class="sub">${last ? `${shortDate(last.date || last.start_at)} · ${humanMinutes(last.duration)}` : "最近 30 天暂无训练"}</div>
-    </div>
-    <div class="highlight-card">
-      <div class="label">近 7 天训练</div>
-      <div class="value">${home.workouts.count_7d || 0} 次</div>
-      <div class="sub">${humanMinutes(home.workouts.total_minutes_7d || 0)}</div>
-    </div>
-    <div class="highlight-card">
-      <div class="label">近 30 天训练</div>
-      <div class="value">${home.workouts.count_30d || 0} 次</div>
-      <div class="sub">${humanMinutes(home.workouts.total_minutes_30d || 0)} · ${fmtInt.format(home.workouts.total_calories_30d || 0)} 千卡</div>
-    </div>
-  `;
-
-  renderRows("recentWorkoutTable", home.workouts.recent || [], r => `
-    <td>${r.date || shortDate(r.start_at)}</td>
-    <td>${shortActivity(r.activity_type)}</td>
-    <td>${humanMinutes(r.duration)}</td>
-    <td>${r.total_energy_burned ? fmtInt.format(Math.round(r.total_energy_burned)) : "-"}</td>
-  `, 4);
-}
-
-function renderRecentTypes(home) {
-  const el = document.getElementById("typesTable");
-  const rows = home.recent_types || [];
-  if (!rows.length) {
-    el.innerHTML = '<tr><td colspan="3" class="empty">最近 7 天暂无活跃记录类型</td></tr>';
-    return;
-  }
-  el.innerHTML = rows.map(r => `
-    <tr class="clickable" data-raw-type="${r.type}">
-      <td title="${r.type}">${shortType(r.type)}</td>
-      <td>${fmtInt.format(r.count_7d || 0)}</td>
-      <td>${shortDateTime(r.last_at)}</td>
-    </tr>
-  `).join("");
-  el.querySelectorAll("tr.clickable").forEach(tr => {
-    tr.addEventListener("click", () => openTypeDetail(tr.dataset.rawType));
-  });
-}
-
-function renderDevices(home) {
-  const el = document.getElementById("deviceList");
-  const items = [];
-  (home.sync.devices || []).forEach(device => {
-    items.push({
-      name: displayDeviceName(device.device_id),
-      status: device.last_sync_status || "",
-      meta: [
-        device.last_sync_at ? `最近同步 ${shortDateTime(device.last_sync_at)}` : "尚未完成同步",
-        device.last_accepted_count != null ? `最近接受 ${fmtInt.format(device.last_accepted_count)} 条` : null,
-      ].filter(Boolean).join(" · ")
-    });
-  });
-
-  if (!items.length) {
-    el.innerHTML = '<div class="empty">暂无同步或设备信息</div>';
-    return;
-  }
-
-  el.innerHTML = items.map(item => `
-    <div class="device-item">
-      <div class="top">
-        <div class="name">${item.name}</div>
-        <span class="pill ${item.status === "failed" || item.status === "stalled" ? "warn" : item.status === "running" ? "blue" : ""}">${humanSyncStatus(item.status)}</span>
-      </div>
-      <div class="meta">${item.meta}</div>
-    </div>
-  `).join("");
-}
-
-function renderSyncEvents(syncState) {
-  const el = document.getElementById("syncEventTable");
-  const rows = syncState && Array.isArray(syncState.recent_events) ? syncState.recent_events : [];
-  if (!rows.length) {
-    el.innerHTML = '<tr><td colspan="3" class="empty">暂无自动同步记录</td></tr>';
-    return;
-  }
-  el.innerHTML = rows.slice(0, 6).map(row => `
-    <tr>
-      <td>${displayDeviceName(row.device_id)}<div class="panel-subtitle">${humanSyncStatus(row.status)}</div></td>
-      <td>${shortDateTime(row.received_at || row.sent_at)}</td>
-      <td>${fmtInt.format(row.accepted_count || 0)} 条</td>
-    </tr>
-  `).join("");
-}
-
-function renderStatus() {
-  document.getElementById("backendStatus").innerHTML = '<span class="dot"></span><span>同步正常</span>';
-}
-
-function renderAIControls(home) {
-  const select = document.getElementById("aiModelSelect");
-  const analyzeBtn = document.getElementById("aiAnalyzeBtn");
-  const refreshBtn = document.getElementById("aiRefreshBtn");
-  const meta = document.getElementById("aiMeta");
-  const ai = home.ai || {};
-  const models = ai.models || [];
-
-  select.innerHTML = models.map(model => `
-    <option value="${model}" ${model === ai.default_model ? "selected" : ""}>${MODEL_LABELS[model] || model}</option>
-  `).join("");
-
-  const enabled = Boolean(ai.available && models.length);
-  select.disabled = !enabled;
-  analyzeBtn.disabled = !enabled;
-  refreshBtn.disabled = !enabled;
-
-  if (!enabled) {
-    meta.textContent = "AI 总结当前不可用。";
-  } else {
-    meta.textContent = "选择一种模型后，手动生成一份最近数据总结。";
-  }
-}
-
-function renderAIAnalysis(result) {
-  const panel = document.getElementById("aiPanel");
-  const meta = document.getElementById("aiMeta");
-  if (!result || !result.analysis) {
-    panel.innerHTML = '<div class="empty">暂无 AI 分析结果。</div>';
-    return;
-  }
-  const analysis = result.analysis;
-  const bullets = Array.isArray(analysis.bullets) ? analysis.bullets : [];
-  const watchouts = Array.isArray(analysis.watchouts) ? analysis.watchouts : [];
-  const nextFocus = Array.isArray(analysis.next_focus) ? analysis.next_focus : [];
-  panel.innerHTML = `
-    <div class="ai-title">${analysis.title || "智能总结"}</div>
-    <div class="ai-summary">${analysis.summary || "-"}</div>
-    <div class="ai-section">
-      <div class="label">重点</div>
-      <ul>${bullets.map(item => `<li>${item}</li>`).join("") || "<li>暂无</li>"}</ul>
-    </div>
-    <div class="ai-section">
-      <div class="label">注意</div>
-      <ul>${watchouts.map(item => `<li>${item}</li>`).join("") || "<li>暂无明显风险提示</li>"}</ul>
-    </div>
-    <div class="ai-section">
-      <div class="label">下一步关注</div>
-      <ul>${nextFocus.map(item => `<li>${item}</li>`).join("") || "<li>继续观察近期数据变化</li>"}</ul>
-    </div>
-    <div class="ai-section">
-      <div class="label">置信度</div>
-      <div>${analysis.confidence || "-"}</div>
-    </div>
-  `;
-  meta.textContent = `生成于 ${shortDateTime(result.generated_at)} · ${MODEL_LABELS[result.model] || result.model}`;
-}
-
-function renderAIReportHistory(reports) {
-  const root = document.getElementById("aiHistory");
-  if (!reports || !reports.length) {
-    root.innerHTML = '<div class="empty">还没有最近总结。</div>';
-    return;
-  }
-  root.innerHTML = reports.map((report, idx) => `
-    <div class="ai-history-item" data-report-idx="${idx}">
-      <div class="ai-history-top">
-        <div class="ai-history-title">${report.analysis && report.analysis.title ? report.analysis.title : "AI 总结"}</div>
-        <span class="pill blue">${MODEL_LABELS[report.model] || report.model}</span>
-      </div>
-      <div class="ai-history-meta">${shortDateTime(report.generated_at)}</div>
-      <div class="ai-history-summary">${report.analysis && report.analysis.summary ? report.analysis.summary : "-"}</div>
-    </div>
-  `).join("");
-  root.querySelectorAll(".ai-history-item").forEach(node => {
-    node.addEventListener("click", () => {
-      const report = dashboardState.aiReports[Number(node.dataset.reportIdx)];
-      if (report) renderAIAnalysis(report);
-    });
-  });
-}
-
-async function loadAIReportHistory() {
-  try {
-    const reports = await api("/api/dashboard/ai-reports?limit=6");
-    dashboardState.aiReports = Array.isArray(reports) ? reports : [];
-    renderAIReportHistory(dashboardState.aiReports);
-  } catch (err) {
-    document.getElementById("aiHistory").innerHTML = `<div class="empty">最近总结加载失败: ${err.message}</div>`;
-  }
-}
-
-async function generateAIAnalysis(forceRefresh = false) {
-  const home = dashboardState.home;
-  if (!home || !home.ai || !home.ai.available) return;
-  const panel = document.getElementById("aiPanel");
-  const meta = document.getElementById("aiMeta");
-  const model = document.getElementById("aiModelSelect").value || home.ai.default_model;
-  panel.innerHTML = '<div class="empty">AI 正在分析最近数据…</div>';
-  meta.textContent = `正在生成总结…`;
-  try {
-    const result = await api("/api/dashboard/ai-analysis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model, force_refresh: forceRefresh }),
-    });
-    renderAIAnalysis(result);
-    await loadAIReportHistory();
-  } catch (err) {
-    panel.innerHTML = `<div class="empty">AI 分析失败: ${err.message}</div>`;
-    meta.textContent = "AI 请求失败。";
-  }
-}
-
-let loading = false;
-async function loadDashboard() {
-  if (loading) return;
-  loading = true;
-  document.getElementById("apiHint").textContent = "";
-  document.getElementById("backendStatus").innerHTML = '<span class="dot"></span><span>正在加载…</span>';
-  try {
-    const [home, aiReports, deviceSyncState] = await Promise.all([
-      api("/api/dashboard/home"),
-      api("/api/dashboard/ai-reports?limit=6").catch(() => []),
-      api("/api/device-sync-state").catch(() => null),
-    ]);
-    dashboardState.home = home;
-    dashboardState.aiReports = Array.isArray(aiReports) ? aiReports : [];
-    dashboardState.deviceSyncState = deviceSyncState;
-    renderStatus();
-    document.getElementById("apiHint").textContent = home.sync.last_sync_at
-      ? `最近更新于 ${shortDateTime(home.sync.last_sync_at)}`
-      : "等待同步数据";
-    renderAIControls(home);
-    renderAIReportHistory(dashboardState.aiReports);
-    if (dashboardState.aiReports.length) renderAIAnalysis(dashboardState.aiReports[0]);
-    renderHero(home);
-    renderMetricCards(home);
-    renderStepsPanel(home);
-    renderSleepPanel(home);
-    renderHeartRatePanel(home);
-    renderInsights(home);
-    renderWorkouts(home);
-    renderRecentTypes(home);
-    renderDevices(home);
-    renderSyncEvents(deviceSyncState);
-  } catch (err) {
-    document.getElementById("backendStatus").innerHTML = `<span class="dot red"></span><span>${err.message}</span>`;
-  } finally {
-    loading = false;
-  }
-}
-
-function unitLabel(unit) {
-  const map = {
-    "count/min": "次/分", "count": "次", "%": "%", "kcal": "千卡",
-    "m": "米", "km": "千米", "min": "分钟", "ms": "毫秒",
-    "degC": "°C", "W": "瓦", "m/s": "米/秒", "dBASPL": "分贝",
-  };
-  return map[unit] || unit || "";
-}
-
-const SUM_TYPES = new Set([
-  "StepCount", "ActiveEnergyBurned", "BasalEnergyBurned",
-  "DistanceWalkingRunning", "DistanceCycling", "DistanceSwimming",
-  "DistanceWheelchair", "DistanceDownhillSnowSports",
-  "FlightsClimbed", "AppleExerciseTime", "AppleStandTime",
-  "SwimmingStrokeCount", "PushCount", "TimeInDaylight",
-]);
-
-const METRIC_MAP = {
-  steps: { type: "HKQuantityTypeIdentifierStepCount", agg: "sum", title: "今日步数", color: "#3f7d6b" },
-  hr: { type: "HKQuantityTypeIdentifierHeartRate", agg: "avg", title: "今日心率", color: "#d35d47" },
-};
-
-function aggForType(rawType) {
-  const short = rawType
-    .replace("HKQuantityTypeIdentifier", "")
-    .replace("HKCategoryTypeIdentifier", "");
-  return SUM_TYPES.has(short) ? "sum" : "avg";
-}
-
-const modal = document.getElementById("typeModal");
-const modalCanvas = document.getElementById("modalCanvas");
-let currentModalType = null;
-let modalDays = 30;
-let modalMode = "daily";
-let currentHourlyMetric = null;
-let currentHourlyDate = "";
-
-document.getElementById("modalClose").addEventListener("click", closeModal);
-modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
-
-function closeModal() {
-  modal.classList.remove("open");
-  currentModalType = null;
-  currentHourlyMetric = null;
-  modalMode = "daily";
-  document.getElementById("modalRange").style.display = "";
-  document.getElementById("modalHourlyDate").style.display = "none";
-}
-
-async function openTypeDetail(rawType) {
-  modalMode = "daily";
-  currentHourlyMetric = null;
-  document.getElementById("modalRange").style.display = "";
-  document.getElementById("modalHourlyDate").style.display = "none";
-  currentModalType = rawType;
-  modalDays = 30;
-  document.getElementById("modalTitle").textContent = shortType(rawType);
-  document.getElementById("modalSub").textContent = rawType;
-  document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">加载中…</div></div>';
-  document.querySelectorAll("#modalRange button").forEach(b => b.classList.toggle("active", Number(b.dataset.days) === 30));
-  modal.classList.add("open");
-  await loadModalData(rawType, modalDays);
-}
-
-async function loadModalData(rawType, days) {
-  if (currentModalType !== rawType) return;
-  if (rawType === "HKCategoryTypeIdentifierSleepAnalysis") {
-    await loadSleepModal(days);
-    return;
-  }
-  const agg = aggForType(rawType);
-  const start = days > 0 ? dateDaysAgo(days) : "";
-  const qs = start ? `&start=${start}` : "";
-  const data = await api(`/api/records/daily?type=${encodeURIComponent(rawType)}&agg=${agg}${qs}`);
-  if (currentModalType !== rawType) return;
-
-  const vals = data.map(d => d.value).filter(v => v != null).map(Number);
-  const unit = data.length ? unitLabel(data[0].unit) : "";
-  const aggLabel = agg === "sum" ? "日合计" : "日均值";
-  const totalCount = data.reduce((s, d) => s + (d.count || 0), 0);
-
-  if (vals.length) {
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
-    document.getElementById("modalStats").innerHTML = `
-      <div class="modal-stat"><div class="label">${aggLabel}均值</div><div class="val">${fmtNum(avg)} <small>${unit}</small></div></div>
-      <div class="modal-stat"><div class="label">${aggLabel}最低</div><div class="val">${fmtNum(min)} <small>${unit}</small></div></div>
-      <div class="modal-stat"><div class="label">${aggLabel}最高</div><div class="val">${fmtNum(max)} <small>${unit}</small></div></div>
-      <div class="modal-stat"><div class="label">覆盖天数</div><div class="val">${data.length}</div></div>
-      <div class="modal-stat"><div class="label">原始记录数</div><div class="val">${fmtInt.format(totalCount)}</div></div>
-    `;
-  } else {
-    document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">暂无数据</div></div>';
-  }
-
-  drawLineChart(modalCanvas, [
-    { values: data.map(d => d.value == null ? null : Number(d.value)), color: "#3f7d6b", width: 2, fill: "rgba(63,125,107,0.1)" },
-  ], { xLabels: data.map(d => shortDate(d.date)), yMin: agg === "sum" ? 0 : undefined });
-}
-
-async function loadSleepModal(days) {
-  const start = days > 0 ? dateDaysAgo(days) : "";
-  const qs = start ? `?start=${start}` : "";
-  const data = await api(`/api/sleep/daily${qs}`);
-  if (currentModalType !== "HKCategoryTypeIdentifierSleepAnalysis") return;
-  const vals = data.map(d => d.total_hours).filter(v => v != null).map(Number);
-  const totalNights = data.length;
-  if (vals.length) {
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
-    const last = data[data.length - 1];
-    document.getElementById("modalStats").innerHTML = `
-      <div class="modal-stat"><div class="label">平均睡眠</div><div class="val">${fmtHours(avg)}</div></div>
-      <div class="modal-stat"><div class="label">最短一晚</div><div class="val">${fmtHours(min)}</div></div>
-      <div class="modal-stat"><div class="label">最长一晚</div><div class="val">${fmtHours(max)}</div></div>
-      <div class="modal-stat"><div class="label">覆盖晚数</div><div class="val">${totalNights}</div></div>
-      <div class="modal-stat"><div class="label">最近一晚</div><div class="val">${last ? fmtHours(last.total_hours) : "-"}</div></div>
-    `;
-  } else {
-    document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">暂无睡眠数据</div></div>';
-  }
-  drawLineChart(modalCanvas, [
-    { values: data.map(d => d.total_hours == null ? null : Number(d.total_hours)), color: "#4a7fc4", width: 2.5, fill: "rgba(74,127,196,0.1)" },
-  ], { xLabels: data.map(d => shortDate(d.date)), yMin: 0 });
-}
-
-async function openMetricDetail(metric) {
-  if (metric === "sleep") {
-    openTypeDetail("HKCategoryTypeIdentifierSleepAnalysis");
-    return;
-  }
-  if (metric === "sync") {
-    openSyncDetail();
-    return;
-  }
-  const cfg = METRIC_MAP[metric];
-  if (!cfg) return;
-  modalMode = "hourly";
-  currentModalType = null;
-  currentHourlyMetric = metric;
-  currentHourlyDate = todayStr();
-  document.getElementById("modalTitle").textContent = cfg.title;
-  document.getElementById("modalSub").textContent = "每小时分布";
-  document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">加载中…</div></div>';
-  document.getElementById("modalRange").style.display = "none";
-  document.getElementById("modalHourlyDate").style.display = "";
-  document.getElementById("modalDateLabel").textContent = "今天";
-  document.getElementById("modalDateNext").disabled = true;
-  modal.classList.add("open");
-  await loadMetricHourly(metric, currentHourlyDate);
-}
-
-async function loadMetricHourly(metric, date) {
-  const cfg = METRIC_MAP[metric];
-  if (!cfg) return;
-  try {
-    const data = await api(`/api/records/hourly?type=${encodeURIComponent(cfg.type)}&agg=${cfg.agg}&date=${date}`);
-    const slots = Array(24).fill(0);
-    for (const d of data) slots[d.hour] = d.value || 0;
-    const totalCount = data.reduce((s, d) => s + (d.count || 0), 0);
-    const unit = data.length ? unitLabel(data[0].unit) : "";
-    const nonZero = slots.filter(v => v > 0);
-    if (nonZero.length) {
-      const total = cfg.agg === "sum" ? slots.reduce((a, b) => a + b, 0) : null;
-      const avg = nonZero.reduce((a, b) => a + b, 0) / nonZero.length;
-      const max = Math.max(...nonZero);
-      const peakHour = slots.indexOf(max);
-      document.getElementById("modalStats").innerHTML = `
-        ${total != null ? `<div class="modal-stat"><div class="label">全天合计</div><div class="val">${fmtNum(total)} <small>${unit}</small></div></div>` : ""}
-        <div class="modal-stat"><div class="label">${cfg.agg === "sum" ? "小时均值" : "全天均值"}</div><div class="val">${fmtNum(avg)} <small>${unit}</small></div></div>
-        <div class="modal-stat"><div class="label">峰值</div><div class="val">${fmtNum(max)} <small>${unit}</small></div></div>
-        <div class="modal-stat"><div class="label">峰值时段</div><div class="val">${peakHour}:00</div></div>
-        <div class="modal-stat"><div class="label">记录条数</div><div class="val">${fmtInt.format(totalCount)}</div></div>
-      `;
-    } else {
-      document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">当日暂无数据</div></div>';
-    }
-    drawBarChart(modalCanvas, slots, { color: cfg.color });
-  } catch (err) {
-    document.getElementById("modalStats").innerHTML = `<div class="modal-stat"><div class="label">加载失败: ${err.message}</div></div>`;
-  }
-}
-
-function openSyncDetail() {
-  const home = dashboardState.home;
-  modalMode = "sync";
-  currentModalType = null;
-  currentHourlyMetric = null;
-  document.getElementById("modalTitle").textContent = "同步详情";
-  document.getElementById("modalSub").textContent = "近期数据新鲜度与自动同步状态";
-  document.getElementById("modalRange").style.display = "none";
-  document.getElementById("modalHourlyDate").style.display = "none";
-  if (!home) {
-    document.getElementById("modalStats").innerHTML = '<div class="modal-stat"><div class="label">暂无数据</div></div>';
-    modal.classList.add("open");
-    return;
-  }
-  document.getElementById("modalStats").innerHTML = `
-    <div class="modal-stat"><div class="label">最后同步</div><div class="val">${shortDateTime(home.sync.last_sync_at) || "-"}</div></div>
-    <div class="modal-stat"><div class="label">数据新鲜度</div><div class="val">${humanFreshness(home.sync.hours_since_last_sync)}</div></div>
-    <div class="modal-stat"><div class="label">今日同步次数</div><div class="val">${home.sync.today_sync_count || 0}</div></div>
-    <div class="modal-stat"><div class="label">今日接受记录</div><div class="val">${fmtInt.format(home.sync.today_sync_accepted || 0)} 条</div></div>
-    <div class="modal-stat"><div class="label">设备数</div><div class="val">${(home.sync.devices || []).length}</div></div>
-    <div class="modal-stat"><div class="label">最近设备状态</div><div class="val">${home.sync.devices && home.sync.devices[0] ? humanSyncStatus(home.sync.devices[0].last_sync_status) : "-"}</div></div>
-  `;
-  const ctx = modalCanvas.getContext("2d");
-  const dpr = window.devicePixelRatio || 1;
-  const rect = modalCanvas.parentElement.getBoundingClientRect();
-  modalCanvas.width = rect.width * dpr;
-  modalCanvas.height = rect.height * dpr;
-  ctx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
-  modal.classList.add("open");
-}
-
-document.querySelectorAll("#modalRange button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    if (modalMode !== "daily") return;
-    document.querySelectorAll("#modalRange button").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    modalDays = Number(btn.dataset.days);
-    if (currentModalType) loadModalData(currentModalType, modalDays);
-  });
-});
-
-document.getElementById("modalDatePrev").addEventListener("click", () => {
-  const d = new Date(`${currentHourlyDate}T12:00:00`);
-  d.setDate(d.getDate() - 1);
-  currentHourlyDate = d.toISOString().slice(0, 10);
-  const isToday = currentHourlyDate >= todayStr();
-  document.getElementById("modalDateLabel").textContent = isToday ? "今天" : currentHourlyDate;
-  document.getElementById("modalDateNext").disabled = isToday;
-  if (currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate);
-});
-
-document.getElementById("modalDateNext").addEventListener("click", () => {
-  const today = todayStr();
-  if (currentHourlyDate >= today) return;
-  const d = new Date(`${currentHourlyDate}T12:00:00`);
-  d.setDate(d.getDate() + 1);
-  currentHourlyDate = d.toISOString().slice(0, 10);
-  const isToday = currentHourlyDate >= today;
-  document.getElementById("modalDateLabel").textContent = isToday ? "今天" : currentHourlyDate;
-  document.getElementById("modalDateNext").disabled = isToday;
-  if (currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate);
-});
-
-document.querySelectorAll(".metric-card.clickable").forEach(card => {
-  card.addEventListener("click", () => openMetricDetail(card.dataset.metric));
-});
-
-document.getElementById("reloadBtn").addEventListener("click", loadDashboard);
-document.getElementById("aiAnalyzeBtn").addEventListener("click", () => generateAIAnalysis(false));
-document.getElementById("aiRefreshBtn").addEventListener("click", () => generateAIAnalysis(true));
-
-let resizeTimer;
-window.addEventListener("resize", () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    if (dashboardState.home) {
-      renderStepsPanel(dashboardState.home);
-      renderSleepPanel(dashboardState.home);
-      renderHeartRatePanel(dashboardState.home);
-    }
-    if (modalMode === "hourly" && currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate);
-    else if (currentModalType) loadModalData(currentModalType, modalDays);
-  }, 200);
-});
-
-loadDashboard();
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/dashboard/app.js"></script>
 </body>
 </html>

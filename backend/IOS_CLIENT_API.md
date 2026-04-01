@@ -219,13 +219,13 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 ### 请求示例
 
 ```text
-GET /api/records/recent?device_id=jiaxu-iphone&limit=20
+GET /api/records/recent?device_id=primary-iphone&limit=20
 ```
 
 或：
 
 ```text
-GET /api/records/recent?device_id=jiaxu-iphone&type=HKQuantityTypeIdentifierHeartRate&start=2026-03-24&end=2026-03-31&limit=50
+GET /api/records/recent?device_id=primary-iphone&type=HKQuantityTypeIdentifierHeartRate&start=2026-03-24&end=2026-03-31&limit=50
 ```
 
 ### 响应示例
@@ -247,13 +247,13 @@ GET /api/records/recent?device_id=jiaxu-iphone&type=HKQuantityTypeIdentifierHear
       "local_date": "2026-03-31",
       "metadata": {
         "bridge_bundle_id": "com.example.myAppleHealthyBridge",
-        "bridge_device_id": "jiaxu-iphone",
+        "bridge_device_id": "primary-iphone",
         "bridge_kind": "sample",
         "bridge_sent_at": "2026-03-31T08:30:00+08:00",
         "bridge_source": "healthkit",
         "source_name": "Apple Watch"
       },
-      "bridge_device_id": "jiaxu-iphone",
+      "bridge_device_id": "primary-iphone",
       "bridge_bundle_id": "com.example.myAppleHealthyBridge",
       "bridge_sent_at": "2026-03-31T08:30:00+08:00",
       "bridge_kind": "sample",

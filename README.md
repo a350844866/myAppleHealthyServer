@@ -1,31 +1,50 @@
 # myAppleHealthyServer
 
-`myAppleHealthyServer` 是 Apple Health 数据的服务端仓库，当前包含：
+`myAppleHealthyServer` 是一个自建的 Apple Health 服务端，当前包含：
 
 - FastAPI 后端
 - MySQL 存储
-- Health 导出文件导入器
-- iOS 客户端增量同步接口
+- Apple Health 历史导出导入器
+- iOS bridge 增量同步接口
+- 同源静态 dashboard
 
-当前已经和 `myAppleHealthyBridge` 客户端联通的核心接口有：
+## 当前能力
+
+当前已经落地并可用的核心能力：
 
 - `POST /ingest`
 - `GET /api/device-sync-state`
 - `GET /api/device-sync-state/anchors`
-- `GET /api/records/recent`
+- `GET /api/import-status`
+- `GET /api/dashboard/home`
+- `GET /api/sleep/quality`
+- `GET /api/workouts/weekly-summary`
+- `GET /api/workouts/routes`
+- `GET /api/workouts/{id}/route`
+
+dashboard 已完成这一轮优化：
+
+- 前端拆分为 `index.html + styles.css + app.js`
+- Chart.js 图表、深浅主题、骨架屏
+- 预聚合表 `system_summary` / `record_type_stats`
+- 统一 API 响应 `{data, meta}`
+- 首页健康评分、睡眠质量、训练周报
+- 最近运动路线地图
 
 ## 仓库结构
 
 - [backend](./backend)
-  - FastAPI 服务、数据库脚本、接口文档
+  - FastAPI 服务、数据库脚本、导入器、接口文档
 - [frontend](./frontend)
-  - 前端相关代码
+  - 同源 dashboard 前端
 - [docker-compose.yml](./docker-compose.yml)
   - 本地或服务器部署入口
+- [NEXT_STEPS.md](./NEXT_STEPS.md)
+  - 当前状态与后续待办
 
 ## 快速启动
 
-先准备好 MySQL，并设置至少这几个环境变量：
+先准备好 MySQL，并设置至少这些环境变量：
 
 - `HEALTH_DB_HOST`
 - `HEALTH_DB_PORT`
@@ -35,6 +54,7 @@
 
 可选变量：
 
+- `HEALTH_ALLOWED_ORIGINS`
 - `INGEST_API_TOKEN`
 - `HEALTH_LOCAL_TZ`
 - `IMPORT_STALE_SECONDS`
@@ -45,11 +65,11 @@
 启动后端：
 
 ```bash
-export HEALTH_DB_PASSWORD='你的 MySQL 密码'
+export HEALTH_DB_PASSWORD='your-mysql-password'
 docker compose up -d --build backend
 ```
 
-默认对外端口：
+默认访问地址：
 
 ```text
 http://127.0.0.1:18000
@@ -64,7 +84,7 @@ docker compose logs -f backend
 运行导入器：
 
 ```bash
-export HEALTH_DB_PASSWORD='你的 MySQL 密码'
+export HEALTH_DB_PASSWORD='your-mysql-password'
 docker compose run --rm importer
 ```
 
@@ -76,40 +96,30 @@ iOS 客户端应把服务端根地址配置为：
 http://your-server-host:18000
 ```
 
-而不是把 `/ingest` 直接写进 Base URL。
+不要把 `/ingest` 直接写进 Base URL。
 
 客户端当前联调重点：
 
-- 首次优先恢复服务端游标
-- 服务端无游标时由客户端 `Start From Now` 建立基线
-- 增量数据走 `POST /ingest`
-- 最近同步明细通过 `GET /api/records/recent` 排查
+- 服务端游标恢复
+- `POST /ingest` 增量同步
+- `GET /api/records/recent` 联调排查
 
 ## 文档入口
 
 - [backend/README.md](./backend/README.md)
-  - 后端启动、导入、表结构、设计说明
 - [backend/IOS_CLIENT_API.md](./backend/IOS_CLIENT_API.md)
-  - iOS 客户端当前接口契约
 - [backend/INCREMENTAL_SYNC.md](./backend/INCREMENTAL_SYNC.md)
-  - 增量同步思路与数据流
-- [CLAUDE_HANDOFF.md](./CLAUDE_HANDOFF.md)
-  - 给 Claude Code / Codex 的执行层交接说明
-- [IOS_APP_HANDOFF.md](./IOS_APP_HANDOFF.md)
-  - 给 iOS 端的阶段性说明
+- [AGENTS.md](./AGENTS.md)
+- [NEXT_STEPS.md](./NEXT_STEPS.md)
 
-## 当前状态
+## 当前未完成项
 
-当前这套服务端已经支持：
+还没做完的主要是：
 
-- 样本幂等写入 `health_records`
-- 记录每次 ingest 批次
-- 维护设备级同步状态
-- 保存并恢复服务端 anchors
-- 按 `device_id` 查看最近落库明细
-
-当前还没有完成：
-
-- workout 专用 ingest
-- 删除样本 / 回滚同步接口
-- 完整的服务端配置下发能力
+- `aiomysql` 异步化
+- `health_records` 分区
+- `import_batches` 历史治理
+- 多设备对比分析完整版
+- 路线热力图
+- 训练周报完整分析页
+- `alert_rules` / `alert_events`

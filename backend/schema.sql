@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS health_records (
     UNIQUE KEY uq_health_record_hash (record_hash),
     KEY idx_health_type_date (type, local_date),
     KEY idx_health_source_date (source_name, local_date),
-    KEY idx_health_start (start_at)
+    KEY idx_health_start (start_at),
+    KEY idx_hr_dedup (type, start_at, end_at, source_name),
+    KEY idx_hr_type_localdate_value (type, local_date, value_num)
 );
 
 CREATE TABLE IF NOT EXISTS workouts (
@@ -93,7 +95,8 @@ CREATE TABLE IF NOT EXISTS workouts (
     created_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_workout_hash (workout_hash),
     KEY idx_workout_type_date (activity_type, local_date),
-    KEY idx_workout_start (start_at)
+    KEY idx_workout_start (start_at),
+    KEY idx_workouts_start_activity (start_at, activity_type)
 );
 
 CREATE TABLE IF NOT EXISTS workout_statistics (
@@ -251,4 +254,21 @@ CREATE TABLE IF NOT EXISTS ai_dashboard_reports (
     generated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     KEY idx_ai_reports_generated (generated_at),
     KEY idx_ai_reports_snapshot_model_time (snapshot_hash, model, generated_at)
+);
+
+CREATE TABLE IF NOT EXISTS system_summary (
+    summary_key       VARCHAR(64) PRIMARY KEY,
+    summary_json      JSON NOT NULL,
+    refreshed_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_system_summary_refreshed (refreshed_at)
+);
+
+CREATE TABLE IF NOT EXISTS record_type_stats (
+    type              VARCHAR(128) PRIMARY KEY,
+    record_count      BIGINT NOT NULL DEFAULT 0,
+    first_date        DATE NULL,
+    last_date         DATE NULL,
+    refreshed_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_record_type_stats_count (record_count, last_date),
+    KEY idx_record_type_stats_refreshed (refreshed_at)
 );

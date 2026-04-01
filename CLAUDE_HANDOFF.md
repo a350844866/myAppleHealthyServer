@@ -72,7 +72,7 @@
 启动后端：
 
 ```bash
-export HEALTH_DB_PASSWORD='你的 MySQL 密码'
+export HEALTH_DB_PASSWORD='your-mysql-password'
 docker compose up -d --build backend
 ```
 
@@ -90,12 +90,10 @@ python3 -m py_compile backend/main.py
 
 ## 关联仓库
 
-iOS 客户端仓库在：
+iOS 客户端仓库建议与当前服务端仓库并行维护。
 
-- `/Users/liulin/programHost/vibe-coding/appleHealthIosClient`
+如果服务端改了客户端相关契约，至少要同步检查这些角色对应的文件：
 
-如果服务端改了客户端相关契约，必须同时检查客户端这些文件：
-
-- `/Users/liulin/programHost/vibe-coding/appleHealthIosClient/myAppleHealthyBridge/IngestClient.swift`
-- `/Users/liulin/programHost/vibe-coding/appleHealthIosClient/myAppleHealthyBridge/SyncCoordinator.swift`
-- `/Users/liulin/programHost/vibe-coding/appleHealthIosClient/myAppleHealthyBridge/RecentSyncedDataView.swift`
+- `IngestClient.swift`
+- `SyncCoordinator.swift`
+- `RecentSyncedDataView.swift`

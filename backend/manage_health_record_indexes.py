@@ -10,6 +10,8 @@ NONCRITICAL_INDEXES = {
     "idx_health_type_date": "ALTER TABLE health_records ADD KEY idx_health_type_date (type, local_date)",
     "idx_health_source_date": "ALTER TABLE health_records ADD KEY idx_health_source_date (source_name, local_date)",
     "idx_health_start": "ALTER TABLE health_records ADD KEY idx_health_start (start_at)",
+    "idx_hr_dedup": "ALTER TABLE health_records ADD KEY idx_hr_dedup (type, start_at, end_at, source_name)",
+    "idx_hr_type_localdate_value": "ALTER TABLE health_records ADD KEY idx_hr_type_localdate_value (type, local_date, value_num)",
 }
 
 
