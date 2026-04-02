@@ -4,10 +4,20 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
+from backend.config import LOCAL_TIMEZONE
 from backend.database import get_db
 from backend.responses import api_response, list_response
+from backend.services.step_service import (
+    query_preferred_quantity_daily_rows,
+    query_preferred_quantity_total,
+    query_preferred_step_total,
+    query_preferred_step_daily_rows,
+    rollup_quantity_monthly,
+    rollup_step_monthly,
+)
 from backend.services.summary_service import get_overview_summary, refresh_all_summaries
 from backend.utils import rows_to_list
+from datetime import datetime
 
 router = APIRouter()
 
@@ -24,12 +34,18 @@ def refresh_system_summary():
 
 @router.get("/api/stats/today")
 def get_today_stats():
+    today = datetime.now(LOCAL_TIMEZONE).date().isoformat()
     with get_db() as db, db.cursor() as cur:
+        steps = query_preferred_step_total(cur, date=today)
+        active_calories = query_preferred_quantity_total(
+            cur,
+            metric_type="HKQuantityTypeIdentifierActiveEnergyBurned",
+            date=today,
+        )
+
         cur.execute(
             """
             SELECT
-                COALESCE(SUM(CASE WHEN type=%s AND local_date=CURDATE() THEN value_num END), 0) AS steps,
-                COALESCE(SUM(CASE WHEN type=%s AND local_date=CURDATE() THEN value_num END), 0) AS active_calories,
                 AVG(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_avg,
                 MIN(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_min,
                 MAX(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_max,
@@ -40,8 +56,6 @@ def get_today_stats():
             WHERE local_date=CURDATE()
             """,
             [
-                "HKQuantityTypeIdentifierStepCount",
-                "HKQuantityTypeIdentifierActiveEnergyBurned",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
@@ -66,8 +80,8 @@ def get_today_stats():
         last_sync = cur.fetchone()
 
     return api_response({
-        "steps": int(today_row["steps"] or 0),
-        "active_calories": round(today_row["active_calories"] or 0),
+        "steps": steps,
+        "active_calories": round(active_calories or 0),
         "heart_rate": {
             "avg": round(today_row["hr_avg"], 1) if today_row["hr_avg"] else None,
             "min": round(today_row["hr_min"], 1) if today_row["hr_min"] else None,
@@ -113,4 +127,40 @@ def get_monthly_stats(year: Optional[int] = Query(None)):
                 *params,
             ],
         )
-        return list_response(rows_to_list(cur.fetchall()))
+        rows = rows_to_list(cur.fetchall())
+
+        step_start = f"{year}-01-01" if year else None
+        step_end = f"{year}-12-31" if year else None
+        monthly_steps = rollup_step_monthly(query_preferred_step_daily_rows(cur, start=step_start, end=step_end))
+        monthly_active_calories = rollup_quantity_monthly(
+            query_preferred_quantity_daily_rows(
+                cur,
+                metric_type="HKQuantityTypeIdentifierActiveEnergyBurned",
+                start=step_start,
+                end=step_end,
+            )
+        )
+
+    by_month = {row["month"]: row for row in rows}
+    for month, steps in monthly_steps.items():
+        row = by_month.setdefault(month, {
+            "month": month,
+            "avg_heart_rate": None,
+            "active_calories": None,
+            "avg_spo2": None,
+        })
+        row["steps"] = steps
+    for month, active_calories in monthly_active_calories.items():
+        row = by_month.setdefault(month, {
+            "month": month,
+            "steps": 0,
+            "avg_heart_rate": None,
+            "active_calories": None,
+            "avg_spo2": None,
+        })
+        row["active_calories"] = active_calories
+    for row in by_month.values():
+        row["steps"] = int(row.get("steps") or 0)
+        if row.get("active_calories") is not None:
+            row["active_calories"] = round(float(row["active_calories"]), 3)
+    return list_response(sorted(by_month.values(), key=lambda item: item["month"]))

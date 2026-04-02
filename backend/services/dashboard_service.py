@@ -9,6 +9,11 @@ from backend.database import get_db
 from backend.queries.heart_rate import query_daily_heart_rate_rows
 from backend.queries.sleep import query_sleep_daily_rows, query_sleep_stage_rows
 from backend.services.ai_service import get_ai_config
+from backend.services.step_service import (
+    query_preferred_quantity_total,
+    query_preferred_step_daily_rows,
+    query_preferred_step_total,
+)
 from backend.services.sync_service import prioritize_devices
 from backend.utils import as_int, mean, percent_change, round_or_none, rows_to_list
 
@@ -105,43 +110,34 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
     thirty_days_ago = (today - timedelta(days=29)).isoformat()
 
     with get_db() as db, db.cursor() as cur:
+        steps_today = query_preferred_step_total(cur, date=today.isoformat())
+        active_calories_today = query_preferred_quantity_total(
+            cur,
+            metric_type="HKQuantityTypeIdentifierActiveEnergyBurned",
+            date=today.isoformat(),
+        )
+
         cur.execute(
             """
             SELECT
-                COALESCE(SUM(CASE WHEN type=%s AND local_date=CURDATE() THEN value_num END), 0) AS steps_today,
-                COALESCE(SUM(CASE WHEN type=%s AND local_date=CURDATE() THEN value_num END), 0) AS active_calories_today,
                 AVG(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_avg,
                 MIN(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_min,
                 MAX(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_max,
                 COUNT(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN 1 END) AS hr_count
             FROM health_records
-            WHERE (type IN (%s, %s, %s) AND local_date=CURDATE())
+            WHERE type=%s AND local_date=CURDATE()
             """,
             [
-                "HKQuantityTypeIdentifierStepCount",
-                "HKQuantityTypeIdentifierActiveEnergyBurned",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
-                "HKQuantityTypeIdentifierStepCount",
-                "HKQuantityTypeIdentifierActiveEnergyBurned",
                 "HKQuantityTypeIdentifierHeartRate",
             ],
         )
         today_row = cur.fetchone() or {}
 
-        cur.execute(
-            """
-            SELECT local_date AS date, SUM(value_num) AS steps
-            FROM health_records
-            WHERE type=%s AND local_date >= %s
-            GROUP BY local_date
-            ORDER BY local_date
-            """,
-            ("HKQuantityTypeIdentifierStepCount", fourteen_days_ago),
-        )
-        step_rows = rows_to_list(cur.fetchall())
+        step_rows = query_preferred_step_daily_rows(cur, start=fourteen_days_ago, end=today.isoformat())
 
         sleep_rows = query_sleep_daily_rows(cur, start=fourteen_days_ago)
         hr_rows = query_daily_heart_rate_rows(cur, start=thirty_days_ago)
@@ -235,7 +231,7 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
 
         sleep_stage_rows = query_sleep_stage_rows(cur, start=fourteen_days_ago)
 
-    step_map = {row["date"].isoformat(): as_int(row.get("steps")) for row in step_rows}
+    step_map = {str(row["date"]): as_int(row.get("steps")) for row in step_rows}
     steps_last_14_days = []
     for offset in range(13, -1, -1):
         date_key = (today - timedelta(days=offset)).isoformat()
@@ -361,8 +357,8 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
             },
         },
         "today": {
-            "steps": as_int(today_row.get("steps_today")),
-            "active_calories": as_int(today_row.get("active_calories_today")),
+            "steps": steps_today,
+            "active_calories": as_int(active_calories_today),
             "heart_rate": {
                 "avg": round_or_none(today_row.get("hr_avg"), 1),
                 "min": round_or_none(today_row.get("hr_min"), 1),
@@ -371,7 +367,7 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
             },
         },
         "steps": {
-            "today": as_int(today_row.get("steps_today")),
+            "today": steps_today,
             "last_7_days": steps_last_7_days,
             "total_7d": steps_total_7d,
             "avg_7d": round_or_none(steps_avg_7d, 1),

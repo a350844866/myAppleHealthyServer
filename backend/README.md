@@ -98,12 +98,6 @@ docker compose run --rm importer
 
 列表接口会在 `meta` 里额外带上 `total`、`limit`、`offset` 等信息。
 
-查看 importer 实时输出：
-
-```bash
-docker compose run --rm importer
-```
-
 ## 导入说明
 
 - `python backend/importer.py`
@@ -145,6 +139,7 @@ docker compose run --rm importer
 - `workout_routes` 与 `route_points` 分开，便于后面做地图与轨迹分析
 - `activity_summaries` 单独存每日三环，避免每次都从原始记录重算
 - API 和 importer 都直接连接 MySQL，不再依赖 SQLite 方言
+- 对步数、活动能量、基础代谢、步行距离、爬楼等累计型指标，dashboard 和统计接口会按单日优先来源解析，不直接把多设备来源简单相加
 
 ## 增量同步
 
@@ -176,3 +171,11 @@ dashboard 相关新增能力：
 python3 -m pip install -r backend/requirements.txt
 python3 -m pytest backend/tests
 ```
+
+当前已覆盖的高价值点包括：
+
+- dashboard 响应包装
+- 多来源累计指标聚合口径
+- records / energy 路由口径
+- 运动路线接口采样
+- ingest 去重统计与失败更新逻辑

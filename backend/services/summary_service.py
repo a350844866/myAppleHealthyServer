@@ -8,6 +8,7 @@ from backend.cache import overview_cache, record_types_cache
 from backend.config import LOCAL_TIMEZONE, SUMMARY_STALE_SECONDS
 from backend.database import get_db
 from backend.services.schema_service import ensure_summary_tables
+from backend.services.step_service import query_preferred_step_daily_rows
 from backend.utils import rows_to_list
 
 
@@ -99,34 +100,18 @@ def refresh_system_summary() -> dict[str, Any]:
         )
         sleep_days = cur.fetchone()
 
-        cur.execute(
-            """
-            SELECT SUM(value_num) AS steps
-            FROM health_records
-            WHERE type=%s
-            """,
-            ("HKQuantityTypeIdentifierStepCount",),
+        total_step_rows = query_preferred_step_daily_rows(cur)
+        recent_steps = query_preferred_step_daily_rows(
+            cur,
+            start=(datetime.now(LOCAL_TIMEZONE).date() - timedelta(days=7)).isoformat(),
         )
-        total_steps = cur.fetchone()
-
-        cur.execute(
-            """
-            SELECT local_date AS date, SUM(value_num) AS steps
-            FROM health_records
-            WHERE type=%s AND local_date >= (CURDATE() - INTERVAL 7 DAY)
-            GROUP BY local_date
-            ORDER BY local_date
-            """,
-            ("HKQuantityTypeIdentifierStepCount",),
-        )
-        recent_steps = rows_to_list(cur.fetchall())
 
         payload = {
             "profile": profile,
             "records": record_stats,
             "workouts": workout_stats,
             "sleep_days": sleep_days["days"] if sleep_days else 0,
-            "total_steps": int(total_steps["steps"] or 0) if total_steps else 0,
+            "total_steps": sum(int(row.get("steps") or 0) for row in total_step_rows),
             "recent_steps": recent_steps,
         }
 

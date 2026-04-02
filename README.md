@@ -29,6 +29,7 @@ dashboard 已完成这一轮优化：
 - Chart.js 图表、深浅主题、骨架屏
 - 预聚合表 `system_summary` / `record_type_stats`
 - 统一 API 响应 `{data, meta}`
+- 累计型指标已改成按优先来源解析，避免多设备重复累加
 - 首页健康评分、睡眠质量、训练周报
 - 最近运动路线地图
 - 路线热力图
@@ -96,6 +97,8 @@ docker compose run --rm importer
 当前已经补了一组后端回归测试，覆盖：
 
 - dashboard 响应包装
+- 多来源累计指标聚合口径
+- records / energy 路由口径
 - 运动路线接口采样
 - ingest 去重统计与失败更新逻辑
 
@@ -138,5 +141,6 @@ http://your-server-host:18000
 - `health_records` 分区
 - `import_batches` 历史治理
 - 多设备对比分析完整版
+- 非累计型指标的多来源偏斜治理
 - 训练周报完整分析页
 - `alert_rules` / `alert_events`

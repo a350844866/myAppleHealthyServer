@@ -9,6 +9,14 @@ from backend.queries.heart_rate import query_daily_heart_rate_rows
 from backend.queries.sleep import query_sleep_daily_rows, query_sleep_stage_rows
 from backend.responses import api_response, list_response
 from backend.services.summary_service import get_record_type_stats
+from backend.services.step_service import (
+    STEP_COUNT_TYPE,
+    query_preferred_quantity_daily_rows,
+    query_preferred_quantity_hourly_rows,
+    query_preferred_step_daily_rows,
+    query_preferred_step_hourly_rows,
+    uses_preferred_source_resolution,
+)
 from backend.utils import build_date_filters, rows_to_list, stddev
 
 router = APIRouter()
@@ -179,6 +187,27 @@ def get_daily_records(
     end: Optional[str] = Query(None),
     agg: Literal["sum", "avg", "max", "min", "count"] = Query("sum"),
 ):
+    if type == STEP_COUNT_TYPE and agg == "sum":
+        with get_db() as db, db.cursor() as cur:
+            rows = query_preferred_step_daily_rows(cur, start=start, end=end)
+            return list_response(
+                [{"date": row["date"], "value": row["steps"], "count": row["count"], "unit": row["unit"]} for row in rows],
+                type=type,
+                agg=agg,
+            )
+
+    if uses_preferred_source_resolution(type, agg=agg):
+        with get_db() as db, db.cursor() as cur:
+            rows = query_preferred_quantity_daily_rows(cur, metric_type=type, start=start, end=end)
+            return list_response(
+                [
+                    {"date": row["date"], "value": row["value"], "count": row["count"], "unit": row["unit"]}
+                    for row in rows
+                ],
+                type=type,
+                agg=agg,
+            )
+
     # Safe: agg_sql is selected from a fixed whitelist, never from raw user SQL.
     agg_sql = {
         "sum": "SUM(value_num)",
@@ -213,6 +242,26 @@ def get_hourly_records(
     date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today"),
     agg: Literal["sum", "avg", "max", "min", "count"] = Query("sum"),
 ):
+    if type == STEP_COUNT_TYPE and agg == "sum":
+        with get_db() as db, db.cursor() as cur:
+            rows = query_preferred_step_hourly_rows(cur, date=date)
+            return list_response(
+                [{"hour": row["hour"], "value": row["value"], "count": row["count"], "unit": row["unit"]} for row in rows],
+                type=type,
+                agg=agg,
+                date=date or "today",
+            )
+
+    if uses_preferred_source_resolution(type, agg=agg):
+        with get_db() as db, db.cursor() as cur:
+            rows = query_preferred_quantity_hourly_rows(cur, metric_type=type, date=date)
+            return list_response(
+                [{"hour": row["hour"], "value": row["value"], "count": row["count"], "unit": row["unit"]} for row in rows],
+                type=type,
+                agg=agg,
+                date=date or "today",
+            )
+
     # Safe: agg_sql is selected from a fixed whitelist, never from raw user SQL.
     agg_sql = {
         "sum": "SUM(value_num)",
@@ -240,7 +289,7 @@ def get_hourly_records(
 
 @router.get("/api/steps")
 def get_steps(start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
-    return get_daily_records("HKQuantityTypeIdentifierStepCount", start, end, "sum")
+    return get_daily_records(STEP_COUNT_TYPE, start, end, "sum")
 
 
 @router.get("/api/heart-rate")
@@ -355,33 +404,28 @@ def get_body_metrics(start: Optional[str] = Query(None), end: Optional[str] = Qu
 
 @router.get("/api/energy")
 def get_energy(start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
-    conditions = ["type IN (%s, %s)"]
-    params: list = [
-        "HKQuantityTypeIdentifierActiveEnergyBurned",
-        "HKQuantityTypeIdentifierBasalEnergyBurned",
-    ]
-    date_conditions, date_params = build_date_filters("local_date", start, end)
-    conditions.extend(date_conditions)
-    params.extend(date_params)
-
     with get_db() as db, db.cursor() as cur:
-        cur.execute(
-            f"""
-            SELECT local_date AS date,
-                   SUM(CASE WHEN type=%s THEN value_num ELSE 0 END) AS active_cal,
-                   SUM(CASE WHEN type=%s THEN value_num ELSE 0 END) AS basal_cal
-            FROM health_records
-            WHERE {" AND ".join(conditions)}
-            GROUP BY local_date
-            ORDER BY local_date
-            """,
-            [
-                "HKQuantityTypeIdentifierActiveEnergyBurned",
-                "HKQuantityTypeIdentifierBasalEnergyBurned",
-                *params,
-            ],
+        active_rows = query_preferred_quantity_daily_rows(
+            cur,
+            metric_type="HKQuantityTypeIdentifierActiveEnergyBurned",
+            start=start,
+            end=end,
         )
-        return list_response(rows_to_list(cur.fetchall()))
+        basal_rows = query_preferred_quantity_daily_rows(
+            cur,
+            metric_type="HKQuantityTypeIdentifierBasalEnergyBurned",
+            start=start,
+            end=end,
+        )
+
+    by_date: dict[str, dict] = {}
+    for row in active_rows:
+        bucket = by_date.setdefault(row["date"], {"date": row["date"], "active_cal": 0.0, "basal_cal": 0.0})
+        bucket["active_cal"] = row["value"]
+    for row in basal_rows:
+        bucket = by_date.setdefault(row["date"], {"date": row["date"], "active_cal": 0.0, "basal_cal": 0.0})
+        bucket["basal_cal"] = row["value"]
+    return list_response([by_date[key] for key in sorted(by_date)])
 
 
 @router.get("/api/oxygen-saturation")
