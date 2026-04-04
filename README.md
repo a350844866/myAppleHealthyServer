@@ -30,6 +30,7 @@ dashboard 已完成这一轮优化：
 - 预聚合表 `system_summary` / `record_type_stats`
 - 统一 API 响应 `{data, meta}`
 - 累计型指标已改成按优先来源解析，避免多设备重复累加
+- 小时详情视图已按样本真实时间分布修正
 - 首页健康评分、睡眠质量、训练周报
 - 最近运动路线地图
 - 路线热力图
@@ -98,6 +99,7 @@ docker compose run --rm importer
 
 - dashboard 响应包装
 - 多来源累计指标聚合口径
+- 小时分布分桶口径
 - records / energy 路由口径
 - 运动路线接口采样
 - ingest 去重统计与失败更新逻辑
@@ -142,5 +144,7 @@ http://your-server-host:18000
 - `import_batches` 历史治理
 - 多设备对比分析完整版
 - 非累计型指标的多来源偏斜治理
+  - 小时分桶时间锚点已修正
+  - 但心率 / 血氧 / 其他均值类指标仍未做多来源去偏
 - 训练周报完整分析页
 - `alert_rules` / `alert_events`

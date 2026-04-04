@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from backend.config import LOCAL_TIMEZONE
@@ -121,39 +121,108 @@ def query_preferred_quantity_total(cur, *, metric_type: str, date: str | None = 
     return float(rows[0].get("value") or 0)
 
 
+def _sample_anchor(start_at: datetime, end_at: datetime) -> datetime:
+    if end_at > start_at:
+        return start_at + timedelta(seconds=int((end_at - start_at).total_seconds() // 2))
+    return start_at
+
+
+def _split_value_across_hours(
+    *,
+    start_at: datetime,
+    end_at: datetime,
+    value: float,
+    window_start: datetime,
+    window_end: datetime,
+) -> dict[int, float]:
+    if end_at <= start_at:
+        if window_start <= start_at < window_end:
+            return {start_at.hour: value}
+        return {}
+
+    total_seconds = (end_at - start_at).total_seconds()
+    clipped_start = max(start_at, window_start)
+    clipped_end = min(end_at, window_end)
+    if clipped_end <= clipped_start or total_seconds <= 0:
+        return {}
+
+    distributed: dict[int, float] = defaultdict(float)
+    current = clipped_start
+    while current < clipped_end:
+        next_hour = current.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        chunk_end = min(next_hour, clipped_end)
+        overlap_seconds = (chunk_end - current).total_seconds()
+        distributed[current.hour] += value * overlap_seconds / total_seconds
+        current = chunk_end
+    return dict(distributed)
+
+
 def query_preferred_quantity_hourly_rows(cur, *, metric_type: str, date: str | None = None) -> list[dict[str, Any]]:
     target_date = date or datetime.now(LOCAL_TIMEZONE).date().isoformat()
     preferred_rows = query_preferred_quantity_daily_rows(cur, metric_type=metric_type, start=target_date, end=target_date)
     if not preferred_rows:
         return []
     preferred_source = preferred_rows[0].get("source_name")
+    window_start = datetime.fromisoformat(target_date)
+    window_end = window_start + timedelta(days=1)
 
     cur.execute(
         """
         SELECT
-            HOUR(start_at) AS hour,
-            COALESCE(NULLIF(source_name, ''), 'Unknown') AS source_name,
-            SUM(value_num) AS value,
-            COUNT(*) AS count,
-            MIN(unit) AS unit
+            start_at,
+            end_at,
+            value_num AS value,
+            unit
         FROM health_records
-        WHERE type = %s AND value_num IS NOT NULL AND local_date = %s
-        GROUP BY HOUR(start_at), COALESCE(NULLIF(source_name, ''), 'Unknown')
-        ORDER BY hour, value DESC, source_name
+        WHERE type = %s
+          AND value_num IS NOT NULL
+          AND local_date = %s
+          AND COALESCE(NULLIF(source_name, ''), 'Unknown') = %s
+        ORDER BY start_at, end_at, id
         """,
-        [metric_type, target_date],
+        [metric_type, target_date, preferred_source],
     )
-    grouped_rows = rows_to_list(cur.fetchall())
+    source_rows = rows_to_list(cur.fetchall())
+
+    hourly_values: dict[int, float] = defaultdict(float)
+    hourly_counts: dict[int, int] = defaultdict(int)
+    unit = None
+    for row in source_rows:
+        start_at = row.get("start_at")
+        end_at = row.get("end_at") or start_at
+        if not isinstance(start_at, datetime) or not isinstance(end_at, datetime):
+            continue
+        if unit is None and row.get("unit"):
+            unit = row.get("unit")
+        value = float(row.get("value") or 0)
+        for hour, portion in _split_value_across_hours(
+            start_at=start_at,
+            end_at=end_at,
+            value=value,
+            window_start=window_start,
+            window_end=window_end,
+        ).items():
+            hourly_values[hour] += portion
+
+        anchor = _sample_anchor(start_at, end_at)
+        if anchor < window_start:
+            count_hour = 0
+        elif anchor >= window_end:
+            count_hour = 23
+        else:
+            count_hour = anchor.hour
+        hourly_counts[count_hour] += 1
+
     return [
         {
-            "hour": row.get("hour"),
-            "value": float(row.get("value") or 0),
-            "count": as_int(row.get("count")),
-            "unit": row.get("unit"),
-            "source_name": row.get("source_name"),
+            "hour": hour,
+            "value": hourly_values[hour],
+            "count": hourly_counts.get(hour, 0),
+            "unit": unit,
+            "source_name": preferred_source,
         }
-        for row in grouped_rows
-        if row.get("source_name") == preferred_source
+        for hour in sorted(hourly_values)
+        if hourly_values[hour] > 0
     ]
 
 
@@ -188,7 +257,7 @@ def query_preferred_step_hourly_rows(cur, *, date: str | None = None) -> list[di
     return [
         {
             "hour": row.get("hour"),
-            "value": as_int(row.get("value")),
+            "value": float(row.get("value") or 0),
             "count": as_int(row.get("count")),
             "unit": row.get("unit"),
             "source_name": row.get("source_name"),

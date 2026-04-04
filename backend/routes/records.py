@@ -17,7 +17,7 @@ from backend.services.step_service import (
     query_preferred_step_hourly_rows,
     uses_preferred_source_resolution,
 )
-from backend.utils import build_date_filters, rows_to_list, stddev
+from backend.utils import build_date_filters, build_sample_anchor_sql, rows_to_list, stddev
 
 router = APIRouter()
 
@@ -270,16 +270,17 @@ def get_hourly_records(
         "min": "MIN(value_num)",
         "count": "COUNT(*)",
     }[agg]
+    sample_anchor_sql = build_sample_anchor_sql()
     date_filter = "local_date = CURDATE()" if not date else "local_date = %s"
     params: list = [type] + ([date] if date else [])
 
     with get_db() as db, db.cursor() as cur:
         cur.execute(
             f"""
-            SELECT HOUR(start_at) AS hour, {agg_sql} AS value, COUNT(*) AS count, MIN(unit) AS unit
+            SELECT HOUR({sample_anchor_sql}) AS hour, {agg_sql} AS value, COUNT(*) AS count, MIN(unit) AS unit
             FROM health_records
             WHERE type = %s AND value_num IS NOT NULL AND {date_filter}
-            GROUP BY HOUR(start_at)
+            GROUP BY HOUR({sample_anchor_sql})
             ORDER BY hour
             """,
             params,
@@ -304,6 +305,7 @@ def get_heart_rate(
     conditions.extend(date_conditions)
     params.extend(date_params)
     where = " AND ".join(conditions)
+    sample_anchor_sql = build_sample_anchor_sql()
 
     with get_db() as db, db.cursor() as cur:
         if granularity == "raw":
@@ -321,14 +323,14 @@ def get_heart_rate(
         if granularity == "hourly":
             cur.execute(
                 f"""
-                SELECT DATE_FORMAT(start_at, '%%Y-%%m-%%d %%H:00:00') AS hour,
+                SELECT DATE_FORMAT({sample_anchor_sql}, '%%Y-%%m-%%d %%H:00:00') AS hour,
                        AVG(value_num) AS avg_bpm,
                        MIN(value_num) AS min_bpm,
                        MAX(value_num) AS max_bpm,
                        COUNT(*) AS count
                 FROM health_records
                 WHERE {where}
-                GROUP BY DATE_FORMAT(start_at, '%%Y-%%m-%%d %%H')
+                GROUP BY DATE_FORMAT({sample_anchor_sql}, '%%Y-%%m-%%d %%H')
                 ORDER BY hour
                 """,
                 params,

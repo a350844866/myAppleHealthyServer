@@ -59,6 +59,14 @@ def build_date_filters(column: str, start: Optional[str], end: Optional[str]) ->
     return conditions, params
 
 
+def build_sample_anchor_sql(start_column: str = "start_at", end_column: str = "end_at") -> str:
+    return (
+        f"CASE WHEN {end_column} > {start_column} "
+        f"THEN TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, {start_column}, {end_column}) DIV 2, {start_column}) "
+        f"ELSE {start_column} END"
+    )
+
+
 def compact_dict(values: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value not in (None, "", [], {})}
 

@@ -140,6 +140,8 @@ docker compose run --rm importer
 - `activity_summaries` 单独存每日三环，避免每次都从原始记录重算
 - API 和 importer 都直接连接 MySQL，不再依赖 SQLite 方言
 - 对步数、活动能量、基础代谢、步行距离、爬楼等累计型指标，dashboard 和统计接口会按单日优先来源解析，不直接把多设备来源简单相加
+- 对累计型指标的小时分布，服务端会先选单日优先来源，再按样本覆盖时长拆分到各小时，而不是整条记录只落到 `start_at` 所在小时
+- 对心率这类均值 / 瞬时指标的小时分布，服务端会按样本时间锚点分桶，避免长样本仅按开始时间归桶
 
 ## 增量同步
 
@@ -176,6 +178,7 @@ python3 -m pytest backend/tests
 
 - dashboard 响应包装
 - 多来源累计指标聚合口径
+- 小时分布分桶口径
 - records / energy 路由口径
 - 运动路线接口采样
 - ingest 去重统计与失败更新逻辑

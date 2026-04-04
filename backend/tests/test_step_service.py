@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from backend.services.step_service import (
     query_preferred_quantity_daily_rows,
@@ -99,25 +99,34 @@ def test_query_preferred_step_hourly_rows_filters_to_preferred_source():
                 {
                     "date": date(2026, 4, 2),
                     "source_name": "贾诩的Apple Watch",
-                    "steps": 3587,
+                    "value": 3587,
                     "device_name": "Apple Watch",
                     "product_type": "Watch7,9",
                 },
                 {
                     "date": date(2026, 4, 2),
                     "source_name": "尊贵的华为三联屏",
-                    "steps": 2992,
+                    "value": 2992,
                     "device_name": "iPhone",
                     "product_type": "iPhone17,1",
                 },
             ],
         },
         {
-            "match": "GROUP BY HOUR(start_at), COALESCE(NULLIF(source_name, ''), 'Unknown')",
+            "match": "COALESCE(NULLIF(source_name, ''), 'Unknown') = %s",
             "fetchall": [
-                {"hour": 7, "source_name": "贾诩的Apple Watch", "value": 897, "count": 3, "unit": "count"},
-                {"hour": 7, "source_name": "尊贵的华为三联屏", "value": 821, "count": 2, "unit": "count"},
-                {"hour": 13, "source_name": "尊贵的华为三联屏", "value": 16, "count": 1, "unit": "count"},
+                {
+                    "start_at": datetime(2026, 4, 2, 7, 50, 0),
+                    "end_at": datetime(2026, 4, 2, 8, 10, 0),
+                    "value": 20,
+                    "unit": "count",
+                },
+                {
+                    "start_at": datetime(2026, 4, 2, 8, 15, 0),
+                    "end_at": datetime(2026, 4, 2, 8, 15, 0),
+                    "value": 5,
+                    "unit": "count",
+                },
             ],
         },
     ])
@@ -125,7 +134,8 @@ def test_query_preferred_step_hourly_rows_filters_to_preferred_source():
     rows = query_preferred_step_hourly_rows(cursor, date="2026-04-02")
 
     assert rows == [
-        {"hour": 7, "value": 897.0, "count": 3, "unit": "count", "source_name": "贾诩的Apple Watch"},
+        {"hour": 7, "value": 10.0, "count": 0, "unit": "count", "source_name": "贾诩的Apple Watch"},
+        {"hour": 8, "value": 15.0, "count": 2, "unit": "count", "source_name": "贾诩的Apple Watch"},
     ]
     cursor.assert_finished()
 
@@ -237,11 +247,14 @@ def test_query_preferred_quantity_hourly_rows_filters_to_preferred_source():
             ],
         },
         {
-            "match": "GROUP BY HOUR(start_at), COALESCE(NULLIF(source_name, ''), 'Unknown')",
+            "match": "COALESCE(NULLIF(source_name, ''), 'Unknown') = %s",
             "fetchall": [
-                {"hour": 9, "source_name": "尊贵的华为三联屏", "value": 2, "count": 1, "unit": "count"},
-                {"hour": 9, "source_name": "贾诩的Apple Watch", "value": 1, "count": 1, "unit": "count"},
-                {"hour": 14, "source_name": "尊贵的华为三联屏", "value": 2, "count": 1, "unit": "count"},
+                {
+                    "start_at": datetime(2026, 4, 2, 9, 55, 0),
+                    "end_at": datetime(2026, 4, 2, 10, 5, 0),
+                    "value": 4,
+                    "unit": "count",
+                }
             ],
         },
     ])
@@ -253,8 +266,8 @@ def test_query_preferred_quantity_hourly_rows_filters_to_preferred_source():
     )
 
     assert rows == [
-        {"hour": 9, "value": 2.0, "count": 1, "unit": "count", "source_name": "尊贵的华为三联屏"},
-        {"hour": 14, "value": 2.0, "count": 1, "unit": "count", "source_name": "尊贵的华为三联屏"},
+        {"hour": 9, "value": 2.0, "count": 0, "unit": "count", "source_name": "尊贵的华为三联屏"},
+        {"hour": 10, "value": 2.0, "count": 1, "unit": "count", "source_name": "尊贵的华为三联屏"},
     ]
     cursor.assert_finished()
 
