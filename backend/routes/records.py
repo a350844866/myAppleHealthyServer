@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Query
@@ -271,8 +272,11 @@ def get_hourly_records(
         "count": "COUNT(*)",
     }[agg]
     sample_anchor_sql = build_sample_anchor_sql()
-    date_filter = "local_date = CURDATE()" if not date else "local_date = %s"
-    params: list = [type] + ([date] if date else [])
+    if not date:
+        from backend.config import LOCAL_TIMEZONE
+        date = datetime.now(LOCAL_TIMEZONE).date().isoformat()
+    date_filter = "local_date = %s"
+    params: list = [type, date]
 
     with get_db() as db, db.cursor() as cur:
         cur.execute(
@@ -376,7 +380,12 @@ def get_sleep_daily(start: Optional[str] = Query(None), end: Optional[str] = Que
 
 
 @router.get("/api/body-metrics")
-def get_body_metrics(start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
+def get_body_metrics(
+    start: Optional[str] = Query(None),
+    end: Optional[str] = Query(None),
+    limit: int = Query(1000, ge=1, le=5000),
+    offset: int = Query(0),
+):
     types = [
         "HKQuantityTypeIdentifierBodyMass",
         "HKQuantityTypeIdentifierBodyMassIndex",
@@ -390,18 +399,23 @@ def get_body_metrics(start: Optional[str] = Query(None), end: Optional[str] = Qu
     date_conditions, date_params = build_date_filters("local_date", start, end)
     conditions.extend(date_conditions)
     params.extend(date_params)
+    where = " AND ".join(conditions)
 
     with get_db() as db, db.cursor() as cur:
         cur.execute(
             f"""
             SELECT type, unit, value_num AS value, start_at, local_date AS date, source_name
             FROM health_records
-            WHERE {" AND ".join(conditions)}
+            WHERE {where}
             ORDER BY start_at
+            LIMIT %s OFFSET %s
             """,
-            params,
+            params + [limit, offset],
         )
-        return list_response(rows_to_list(cur.fetchall()))
+        rows = cur.fetchall()
+        cur.execute(f"SELECT COUNT(*) AS total FROM health_records WHERE {where}", params)
+        total = cur.fetchone()["total"]
+        return list_response(rows_to_list(rows), total=total, limit=limit, offset=offset)
 
 
 @router.get("/api/energy")

@@ -481,7 +481,7 @@ def get_activity_summaries(start: Optional[str] = Query(None), end: Optional[str
 
 
 @router.get("/api/ecg")
-def list_ecg():
+def list_ecg(limit: int = Query(100, ge=1, le=500), offset: int = Query(0)):
     with get_db() as db, db.cursor() as cur:
         cur.execute(
             """
@@ -489,9 +489,14 @@ def list_ecg():
                    software_version, device, sample_rate, lead_name, unit
             FROM ecg_readings
             ORDER BY record_at
-            """
+            LIMIT %s OFFSET %s
+            """,
+            (limit, offset),
         )
-        return list_response(rows_to_list(cur.fetchall()))
+        rows = cur.fetchall()
+        cur.execute("SELECT COUNT(*) AS total FROM ecg_readings")
+        total = cur.fetchone()["total"]
+        return list_response(rows_to_list(rows), total=total, limit=limit, offset=offset)
 
 
 @router.get("/api/ecg/{ecg_id}")

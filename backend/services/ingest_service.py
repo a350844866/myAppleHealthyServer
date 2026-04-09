@@ -13,10 +13,92 @@ from backend.database import get_db
 from backend.models import IngestPayload
 from backend.utils import compact_dict, format_value_text, isoformat_z, normalize_ingest_datetime
 
+SUPPORTED_INGEST_KINDS = {"sample", "workout"}
+
 
 def make_record_hash(payload: IngestPayload, item) -> str:
     base = f"bridge|{payload.device_id}|{payload.bundle_id}|{item.type}|{item.uuid}"
     return hashlib.sha256(base.encode("utf-8")).hexdigest()
+
+
+def make_workout_hash(payload: IngestPayload, item) -> str:
+    parts = json.dumps(
+        [
+            item.type,
+            payload.device_id,
+            item.metadata.get("source_name", ""),
+            item.metadata.get("source_version", ""),
+            str(item.start_at),
+            str(item.end_at),
+            item.metadata.get("duration", ""),
+            item.metadata.get("total_distance", ""),
+            item.metadata.get("total_energy_burned", ""),
+        ],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(parts.encode("utf-8")).hexdigest()
+
+
+def _try_float(val: str | None) -> float | None:
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def insert_workouts_from_ingest(cur, payload: IngestPayload, workout_items: list) -> int:
+    if not workout_items:
+        return 0
+    inserted = 0
+    for item in workout_items:
+        start_at = normalize_ingest_datetime(item.start_at)
+        end_at = normalize_ingest_datetime(item.end_at)
+        workout_hash = make_workout_hash(payload, item)
+        device_payload = compact_dict(
+            {
+                "device_id": payload.device_id,
+                "bundle_id": payload.bundle_id,
+                "device_name": item.metadata.get("device_name"),
+                "device_model": item.metadata.get("device_model"),
+            }
+        )
+        cur.execute(
+            """
+            INSERT INTO workouts
+                (workout_hash, activity_type, duration, duration_unit,
+                 total_distance, total_distance_unit, total_energy_burned,
+                 total_energy_burned_unit, source_name, source_version,
+                 device, creation_at, start_at, end_at, local_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                total_distance=COALESCE(VALUES(total_distance), total_distance),
+                total_energy_burned=COALESCE(VALUES(total_energy_burned), total_energy_burned),
+                duration=COALESCE(VALUES(duration), duration)
+            """,
+            (
+                workout_hash,
+                item.type,
+                _try_float(item.metadata.get("duration")),
+                item.metadata.get("duration_unit"),
+                _try_float(item.metadata.get("total_distance")),
+                item.metadata.get("total_distance_unit"),
+                _try_float(item.metadata.get("total_energy_burned")),
+                item.metadata.get("total_energy_burned_unit"),
+                item.metadata.get("source_name") or payload.device_id,
+                item.metadata.get("source_version"),
+                json.dumps(device_payload, ensure_ascii=False, sort_keys=True) if device_payload else None,
+                start_at,
+                start_at,
+                end_at,
+                start_at.date(),
+            ),
+        )
+        inserted += max(cur.rowcount, 0)
+    return inserted
 
 
 def health_record_row_from_ingest(payload: IngestPayload, item) -> tuple:
@@ -68,7 +150,7 @@ def serialize_payload(payload: IngestPayload) -> str:
 def require_ingest_token(authorization: str | None) -> None:
     expected = os.getenv("INGEST_API_TOKEN", "").strip()
     if not expected:
-        return
+        raise HTTPException(status_code=503, detail="INGEST_API_TOKEN 未配置，拒绝写入")
     if authorization != f"Bearer {expected}":
         raise HTTPException(status_code=401, detail="无效的 ingest token")
 
@@ -120,9 +202,6 @@ def _clear_caches() -> None:
     dashboard_home_cache.clear()
     record_types_cache.clear()
     overview_cache.clear()
-    with get_db() as db, db.cursor() as cur:
-        cur.execute("DELETE FROM system_summary WHERE summary_key='overview'")
-        cur.execute("DELETE FROM record_type_stats")
 
 
 def _insert_failed_ingest_event(cur, *, payload: IngestPayload, accepted_count: int, error_message: str, payload_json: str) -> None:
@@ -148,9 +227,12 @@ def _insert_failed_ingest_event(cur, *, payload: IngestPayload, accepted_count: 
 def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
     require_ingest_token(authorization)
 
-    unsupported_items = [item.kind for item in payload.items if item.kind != "sample"]
+    unsupported_items = [item.kind for item in payload.items if item.kind not in SUPPORTED_INGEST_KINDS]
     if unsupported_items:
         raise HTTPException(400, f"暂不支持的 ingest kind: {', '.join(sorted(set(unsupported_items)))}")
+
+    sample_items = [item for item in payload.items if item.kind == "sample"]
+    workout_items = [item for item in payload.items if item.kind == "workout"]
 
     payload_json = serialize_payload(payload)
     accepted_count = len(payload.items)
@@ -177,8 +259,9 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
             )
             event_id = int(cur.lastrowid)
 
-            rows = [health_record_row_from_ingest(payload, item) for item in payload.items]
-            inserted_count = 0
+            # --- Insert sample items into health_records ---
+            rows = [health_record_row_from_ingest(payload, item) for item in sample_items]
+            sample_inserted = 0
             if rows:
                 dedup_chunk = 200
                 existing_keys: set = set()
@@ -214,8 +297,12 @@ def ingest_samples(payload: IngestPayload, authorization: str | None) -> dict:
                         """,
                         filtered_rows,
                     )
-                    inserted_count = max(cur.rowcount, 0)
+                    sample_inserted = max(cur.rowcount, 0)
 
+            # --- Insert workout items into workouts table ---
+            workout_inserted = insert_workouts_from_ingest(cur, payload, workout_items)
+
+            inserted_count = sample_inserted + workout_inserted
             deduplicated_count = accepted_count - inserted_count
             upsert_device_sync_state(
                 cur,

@@ -151,47 +151,46 @@ def get_import_status_payload() -> dict:
         cur.execute("SELECT COUNT(*) AS count FROM ecg_readings")
         ecg_count = cur.fetchone()["count"]
 
-    total_files = int(file_summary.get("total") or 0)
-    completed_files = int(file_summary.get("completed") or 0)
-    progress_percent = round((completed_files / total_files) * 100, 1) if total_files else None
-    records_seen = int(file_summary.get("records_seen") or 0)
-    records_inserted = int(file_summary.get("records_inserted") or 0)
-    estimated_total_records = get_xml_record_total()
-    xml_records_seen = int(xml_file.get("records_seen") or 0) if xml_file else records_seen
-    xml_records_inserted = int(xml_file.get("records_inserted") or 0) if xml_file else records_inserted
-    record_progress_percent = (
-        round((xml_records_seen / estimated_total_records) * 100, 1)
-        if estimated_total_records and xml_records_seen
-        else None
-    )
-    last_progress_at = file_summary.get("last_progress_at")
-    seconds_since_progress = None
-    stalled = False
-    if last_progress_at:
-        seconds_since_progress = max(int((now - last_progress_at).total_seconds()), 0)
-        stalled = batch["status"] == "running" and seconds_since_progress > IMPORT_STALE_SECONDS
+        total_files = int(file_summary.get("total") or 0)
+        completed_files = int(file_summary.get("completed") or 0)
+        progress_percent = round((completed_files / total_files) * 100, 1) if total_files else None
+        records_seen = int(file_summary.get("records_seen") or 0)
+        records_inserted = int(file_summary.get("records_inserted") or 0)
+        estimated_total_records = get_xml_record_total()
+        xml_records_seen = int(xml_file.get("records_seen") or 0) if xml_file else records_seen
+        xml_records_inserted = int(xml_file.get("records_inserted") or 0) if xml_file else records_inserted
+        record_progress_percent = (
+            round((xml_records_seen / estimated_total_records) * 100, 1)
+            if estimated_total_records and xml_records_seen
+            else None
+        )
+        last_progress_at = file_summary.get("last_progress_at")
+        seconds_since_progress = None
+        stalled = False
+        if last_progress_at:
+            seconds_since_progress = max(int((now - last_progress_at).total_seconds()), 0)
+            stalled = batch["status"] == "running" and seconds_since_progress > IMPORT_STALE_SECONDS
 
-    scan_rate_per_minute = None
-    insert_rate_per_minute = None
-    eta_minutes = None
-    estimated_completion_at = None
-    current_run_records_seen = None
-    current_run_records_inserted = None
-    has_current_run_baseline = False
+        scan_rate_per_minute = None
+        insert_rate_per_minute = None
+        eta_minutes = None
+        estimated_completion_at = None
+        current_run_records_seen = None
+        current_run_records_inserted = None
+        has_current_run_baseline = False
 
-    if xml_file:
-        xml_run_started_records_seen = int(xml_file.get("run_started_records_seen") or 0)
-        xml_run_started_records_inserted = int(xml_file.get("run_started_records_inserted") or 0)
-        has_current_run_baseline = xml_file.get("run_started_records_seen") is not None
-        current_run_records_seen = max(xml_records_seen - xml_run_started_records_seen, 0)
-        current_run_records_inserted = max(xml_records_inserted - xml_run_started_records_inserted, 0)
+        if xml_file:
+            xml_run_started_records_seen = int(xml_file.get("run_started_records_seen") or 0)
+            xml_run_started_records_inserted = int(xml_file.get("run_started_records_inserted") or 0)
+            has_current_run_baseline = xml_file.get("run_started_records_seen") is not None
+            current_run_records_seen = max(xml_records_seen - xml_run_started_records_seen, 0)
+            current_run_records_inserted = max(xml_records_inserted - xml_run_started_records_inserted, 0)
 
-        cutoff = now - timedelta(minutes=IMPORT_RATE_WINDOW_MINUTES)
-        latest_sample = None
-        baseline_sample = None
-        rate_reference_at = xml_file.get("last_progress_at") or now
+            cutoff = now - timedelta(minutes=IMPORT_RATE_WINDOW_MINUTES)
+            latest_sample = None
+            baseline_sample = None
+            rate_reference_at = xml_file.get("last_progress_at") or now
 
-        with get_db() as db, db.cursor() as cur:
             cur.execute(
                 """
                 SELECT id, recorded_at, records_seen, records_inserted
@@ -254,11 +253,12 @@ def get_import_status_payload() -> dict:
                 )
                 baseline_sample = cur.fetchone()
 
-        if latest_sample:
+        if xml_file and latest_sample:
             rate_reference_at = latest_sample["recorded_at"] or rate_reference_at
 
         if (
-            latest_sample
+            xml_file
+            and latest_sample
             and baseline_sample
             and latest_sample["recorded_at"]
             and baseline_sample["recorded_at"]
@@ -281,13 +281,13 @@ def get_import_status_payload() -> dict:
             if recent_records_inserted > 0:
                 insert_rate_per_minute = round(recent_records_inserted / elapsed_seconds * 60, 1)
 
-        if scan_rate_per_minute is None and batch.get("started_at") and current_run_records_seen and has_current_run_baseline:
+        if xml_file and scan_rate_per_minute is None and batch.get("started_at") and current_run_records_seen and has_current_run_baseline:
             elapsed_seconds = max(int((rate_reference_at - batch["started_at"]).total_seconds()), 1)
             scan_rate_per_minute = round(current_run_records_seen / elapsed_seconds * 60, 1)
             if current_run_records_inserted and current_run_records_inserted > 0:
                 insert_rate_per_minute = round(current_run_records_inserted / elapsed_seconds * 60, 1)
 
-        if estimated_total_records and scan_rate_per_minute and scan_rate_per_minute > 0 and not stalled:
+        if xml_file and estimated_total_records and scan_rate_per_minute and scan_rate_per_minute > 0 and not stalled:
             remaining_records = max(estimated_total_records - xml_records_seen, 0)
             eta_minutes = round(remaining_records / scan_rate_per_minute, 1)
             estimated_completion_at = rate_reference_at + timedelta(minutes=eta_minutes)

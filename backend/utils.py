@@ -43,7 +43,7 @@ def stddev(values: list[float]) -> float | None:
     avg = mean(values)
     if avg is None:
         return None
-    variance = sum((value - avg) ** 2 for value in values) / len(values)
+    variance = sum((value - avg) ** 2 for value in values) / (len(values) - 1)
     return variance ** 0.5
 
 
@@ -80,7 +80,8 @@ def normalize_ingest_datetime(value: datetime) -> datetime:
 def isoformat_z(value: datetime) -> str:
     if value.tzinfo is None:
         return value.replace(microsecond=0).isoformat()
-    return value.replace(microsecond=0).isoformat()
+    from zoneinfo import ZoneInfo
+    return value.astimezone(ZoneInfo("UTC")).replace(microsecond=0, tzinfo=None).isoformat() + "Z"
 
 
 def format_value_text(value: float | None) -> str | None:

@@ -21,7 +21,9 @@ from backend.config import (
 from backend.database import get_db
 from backend.utils import deserialize_json_field
 
-_dashboard_ai_cache: dict[str, dict[str, Any]] = {}
+from backend.cache import TTLCache as _TTLCache
+
+_dashboard_ai_cache = _TTLCache(default_ttl_seconds=AI_ANALYSIS_CACHE_TTL_SECONDS)
 
 
 def get_ai_config() -> dict[str, Any]:
@@ -326,8 +328,8 @@ def list_recent_ai_reports(limit: int) -> list[dict]:
 def analyze_dashboard(home: dict[str, Any], *, model: str, force_refresh: bool) -> dict[str, Any]:
     cache_key = build_ai_cache_key(model, home)
     now_ts = time.time()
-    cached = _dashboard_ai_cache.get(cache_key)
-    if cached and not force_refresh and now_ts - cached["created_at_ts"] <= AI_ANALYSIS_CACHE_TTL_SECONDS:
+    cached = None if force_refresh else _dashboard_ai_cache.get(cache_key)
+    if cached is not None:
         return {
             "model": model,
             "cached": True,
@@ -339,12 +341,11 @@ def analyze_dashboard(home: dict[str, Any], *, model: str, force_refresh: bool) 
     if not force_refresh:
         db_cached = fetch_recent_ai_report_from_db(cache_key, model, max_age_seconds=AI_ANALYSIS_CACHE_TTL_SECONDS)
         if db_cached:
-            _dashboard_ai_cache[cache_key] = {
-                "created_at_ts": now_ts,
+            _dashboard_ai_cache.set(cache_key, {
                 "generated_at": db_cached["generated_at"],
                 "analysis": db_cached["analysis"],
                 "usage": db_cached["usage"],
-            }
+            })
             return {
                 "model": model,
                 "cached": True,
@@ -377,12 +378,11 @@ def analyze_dashboard(home: dict[str, Any], *, model: str, force_refresh: bool) 
         snapshot_payload={"home": home},
     )
     result = {
-        "created_at_ts": now_ts,
         "generated_at": stored_report["generated_at"],
         "analysis": stored_report["analysis"],
         "usage": stored_report["usage"],
     }
-    _dashboard_ai_cache[cache_key] = result
+    _dashboard_ai_cache.set(cache_key, result)
     return {
         "model": model,
         "cached": False,

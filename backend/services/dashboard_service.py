@@ -120,20 +120,14 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
         cur.execute(
             """
             SELECT
-                AVG(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_avg,
-                MIN(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_min,
-                MAX(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_max,
-                COUNT(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN 1 END) AS hr_count
+                AVG(value_num) AS hr_avg,
+                MIN(value_num) AS hr_min,
+                MAX(value_num) AS hr_max,
+                COUNT(*) AS hr_count
             FROM health_records
-            WHERE type=%s AND local_date=CURDATE()
+            WHERE type=%s AND local_date=%s AND value_num IS NOT NULL
             """,
-            [
-                "HKQuantityTypeIdentifierHeartRate",
-                "HKQuantityTypeIdentifierHeartRate",
-                "HKQuantityTypeIdentifierHeartRate",
-                "HKQuantityTypeIdentifierHeartRate",
-                "HKQuantityTypeIdentifierHeartRate",
-            ],
+            ["HKQuantityTypeIdentifierHeartRate", today.isoformat()],
         )
         today_row = cur.fetchone() or {}
 
@@ -142,17 +136,20 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
         sleep_rows = query_sleep_daily_rows(cur, start=fourteen_days_ago)
         hr_rows = query_daily_heart_rate_rows(cur, start=thirty_days_ago)
 
+        seven_days_ago = (today - timedelta(days=6)).isoformat()
+
         cur.execute(
             """
             SELECT
-                SUM(CASE WHEN start_at >= (CURDATE() - INTERVAL 6 DAY) THEN 1 ELSE 0 END) AS count_7d,
-                ROUND(SUM(CASE WHEN start_at >= (CURDATE() - INTERVAL 6 DAY) THEN duration ELSE 0 END), 1) AS total_minutes_7d,
-                ROUND(SUM(CASE WHEN start_at >= (CURDATE() - INTERVAL 29 DAY) THEN total_energy_burned ELSE 0 END), 0) AS total_calories_30d,
-                SUM(CASE WHEN start_at >= (CURDATE() - INTERVAL 29 DAY) THEN 1 ELSE 0 END) AS count_30d,
-                ROUND(SUM(CASE WHEN start_at >= (CURDATE() - INTERVAL 29 DAY) THEN duration ELSE 0 END), 1) AS total_minutes_30d
+                SUM(CASE WHEN start_at >= %s THEN 1 ELSE 0 END) AS count_7d,
+                ROUND(SUM(CASE WHEN start_at >= %s THEN duration ELSE 0 END), 1) AS total_minutes_7d,
+                ROUND(SUM(total_energy_burned), 0) AS total_calories_30d,
+                COUNT(*) AS count_30d,
+                ROUND(SUM(duration), 1) AS total_minutes_30d
             FROM workouts
-            WHERE start_at >= (CURDATE() - INTERVAL 29 DAY)
-            """
+            WHERE start_at >= %s
+            """,
+            [seven_days_ago, seven_days_ago, thirty_days_ago],
         )
         workout_window = cur.fetchone() or {}
 
@@ -162,10 +159,11 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
                    total_distance_unit, total_energy_burned, total_energy_burned_unit,
                    source_name, start_at, end_at, local_date AS date, route_file
             FROM workouts
-            WHERE start_at >= (CURDATE() - INTERVAL 29 DAY)
+            WHERE start_at >= %s
             ORDER BY start_at DESC
             LIMIT 6
-            """
+            """,
+            [thirty_days_ago],
         )
         recent_workouts = rows_to_list(cur.fetchall())
 
@@ -176,11 +174,12 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
                    ROUND(SUM(duration), 1) AS total_minutes,
                    ROUND(SUM(total_energy_burned), 0) AS total_calories
             FROM workouts
-            WHERE start_at >= (CURDATE() - INTERVAL 29 DAY)
+            WHERE start_at >= %s
             GROUP BY activity_type
             ORDER BY count DESC, total_minutes DESC
             LIMIT 5
-            """
+            """,
+            [thirty_days_ago],
         )
         workout_mix = rows_to_list(cur.fetchall())
 
@@ -188,11 +187,12 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
             """
             SELECT type, COUNT(*) AS count_7d, MAX(start_at) AS last_at
             FROM health_records
-            WHERE start_at >= (NOW() - INTERVAL 7 DAY)
+            WHERE start_at >= %s
             GROUP BY type
             ORDER BY count_7d DESC, last_at DESC
             LIMIT 8
-            """
+            """,
+            [now - timedelta(days=7)],
         )
         recent_types = rows_to_list(cur.fetchall())
 
@@ -203,9 +203,10 @@ def get_dashboard_home_payload(*, force_refresh: bool = False) -> dict[str, Any]
                    SUM(accepted_count) AS today_sync_accepted
             FROM ingest_events
             WHERE status='completed'
-              AND received_at >= CURDATE()
-              AND received_at < (CURDATE() + INTERVAL 1 DAY)
-            """
+              AND received_at >= %s
+              AND received_at < %s
+            """,
+            [today.isoformat(), (today + timedelta(days=1)).isoformat()],
         )
         today_sync = cur.fetchone() or {}
 

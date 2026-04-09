@@ -46,33 +46,35 @@ def get_today_stats():
         cur.execute(
             """
             SELECT
-                AVG(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_avg,
-                MIN(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_min,
-                MAX(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN value_num END) AS hr_max,
-                COUNT(CASE WHEN type=%s AND local_date=CURDATE() AND value_num IS NOT NULL THEN 1 END) AS hr_count,
-                SUM(CASE WHEN local_date=CURDATE() THEN 1 ELSE 0 END) AS today_records,
-                COUNT(DISTINCT CASE WHEN local_date=CURDATE() THEN type END) AS today_types
+                AVG(CASE WHEN type=%s AND value_num IS NOT NULL THEN value_num END) AS hr_avg,
+                MIN(CASE WHEN type=%s AND value_num IS NOT NULL THEN value_num END) AS hr_min,
+                MAX(CASE WHEN type=%s AND value_num IS NOT NULL THEN value_num END) AS hr_max,
+                COUNT(CASE WHEN type=%s AND value_num IS NOT NULL THEN 1 END) AS hr_count,
+                COUNT(*) AS today_records,
+                COUNT(DISTINCT type) AS today_types
             FROM health_records
-            WHERE local_date=CURDATE()
+            WHERE local_date=%s
             """,
             [
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
                 "HKQuantityTypeIdentifierHeartRate",
+                today,
             ],
         )
         today_row = cur.fetchone() or {}
 
-        cur.execute("SELECT COUNT(*) AS cnt FROM workouts WHERE local_date=CURDATE()")
+        cur.execute("SELECT COUNT(*) AS cnt FROM workouts WHERE local_date=%s", (today,))
         workouts = cur.fetchone()["cnt"]
 
         cur.execute(
             """
             SELECT MAX(received_at) AS last_sync_at, COUNT(*) AS sync_count, SUM(accepted_count) AS total_accepted
             FROM ingest_events
-            WHERE DATE(received_at)=CURDATE() AND status='completed'
-            """
+            WHERE DATE(received_at)=%s AND status='completed'
+            """,
+            (today,),
         )
         sync_row = cur.fetchone()
 

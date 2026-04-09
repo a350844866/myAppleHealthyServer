@@ -12,7 +12,7 @@
 
 当前已经落地并可用的核心能力：
 
-- `POST /ingest`
+- `POST /ingest`（支持 sample + workout 类型）
 - `GET /api/device-sync-state`
 - `GET /api/device-sync-state/anchors`
 - `GET /api/import-status`
@@ -148,3 +148,4 @@ http://your-server-host:18000
   - 但心率 / 血氧 / 其他均值类指标仍未做多来源去偏
 - 训练周报完整分析页
 - `alert_rules` / `alert_events`
+- `HKDataTypeSleepDurationGoal` 同步（极低优先级）

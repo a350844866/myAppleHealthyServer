@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from contextlib import contextmanager
 
 import pymysql
@@ -14,6 +15,7 @@ except ImportError:  # pragma: no cover - compatibility fallback
     PooledDB = None
 
 _pool: PooledDB | None = None
+_pool_lock = threading.Lock()
 
 
 def _set_autocommit(conn, autocommit: bool) -> None:
@@ -52,15 +54,17 @@ def get_pool() -> PooledDB:
     if PooledDB is None:
         raise RuntimeError("DBUtils 未安装，当前无法创建连接池。")
     if _pool is None:
-        _pool = PooledDB(
-            creator=pymysql,
-            mincached=DB_POOL_MIN_CACHED,
-            maxcached=DB_POOL_MAX_CACHED,
-            maxconnections=DB_POOL_MAX_CONNECTIONS,
-            blocking=True,
-            ping=1,
-            **db_config(),
-        )
+        with _pool_lock:
+            if _pool is None:
+                _pool = PooledDB(
+                    creator=pymysql,
+                    mincached=DB_POOL_MIN_CACHED,
+                    maxcached=DB_POOL_MAX_CACHED,
+                    maxconnections=DB_POOL_MAX_CONNECTIONS,
+                    blocking=True,
+                    ping=1,
+                    **db_config(),
+                )
     return _pool
 
 
