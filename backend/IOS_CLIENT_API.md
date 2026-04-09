@@ -16,9 +16,6 @@
 - 服务端下发式配置
 - 告警规则接口
 - 删除样本 / 回滚同步接口
-- workout 专用 ingest
-
-目前 ingest 只接受普通 sample，客户端不要先发 workout/event/route。
 
 ## Base URL
 
@@ -105,8 +102,8 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 `items[]` 字段：
 
 - `source`: 当前建议固定为 `healthkit`
-- `kind`: 当前只支持 `sample`
-- `type`: HealthKit 类型标识，例如 `HKQuantityTypeIdentifierHeartRate`
+- `kind`: 支持 `sample` 和 `workout`
+- `type`: HealthKit 类型标识，例如 `HKQuantityTypeIdentifierHeartRate`（workout 时为 `HKWorkoutActivityTypeRunning` 等）
 - `uuid`: 样本唯一标识，必须稳定
 - `start_at`: 样本开始时间
 - `end_at`: 样本结束时间
@@ -160,7 +157,7 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 
 ```json
 {
-  "detail": "暂不支持的 ingest kind: workout"
+  "detail": "暂不支持的 ingest kind: correlation"
 }
 ```
 
@@ -199,11 +196,12 @@ Authorization: Bearer <token>   // 可选，取决于服务端配置
 
 ## 服务端当前如何存储
 
-`POST /ingest` 会做三件事：
+`POST /ingest` 会做这些事：
 
 1. 原始批次写入 `ingest_events`
-2. 样本去重后写入 `health_records`
-3. 同步状态与 anchors 写入 `device_sync_state`、`device_sync_anchors`
+2. `kind: "sample"` 的样本去重后写入 `health_records`
+3. `kind: "workout"` 的训练数据去重后写入 `workouts`
+4. 同步状态与 anchors 写入 `device_sync_state`、`device_sync_anchors`
 
 这意味着客户端可以把 `/api/device-sync-state` 当成联调排查入口，把 `/api/device-sync-state/anchors` 当成服务端游标恢复入口。
 
@@ -425,10 +423,10 @@ GET /api/device-sync-state/anchors?device_id=iphone-15-pro-max&bundle_id=com.exa
 
 ## 当前已知限制
 
-- 只支持 `kind = sample`
+- 只支持 `kind = sample` 和 `kind = workout`
 - 还没有服务端分页式 ingest 查询接口
-- 还没有“服务端告诉客户端应同步哪些 type”的配置接口
-- workout 相关对象后续大概率需要单独 schema，而不是直接塞进当前 sample ingest
+- 还没有”服务端告诉客户端应同步哪些 type”的配置接口
+- 还没有 correlation / clinical records 支持
 
 ## 参考文件
 

@@ -131,8 +131,6 @@ http://your-server-host:18000
 
 - [backend/README.md](./backend/README.md)
 - [backend/IOS_CLIENT_API.md](./backend/IOS_CLIENT_API.md)
-- [backend/INCREMENTAL_SYNC.md](./backend/INCREMENTAL_SYNC.md)
-- [AGENTS.md](./AGENTS.md)
 - [NEXT_STEPS.md](./NEXT_STEPS.md)
 
 ## 当前未完成项
