@@ -20,7 +20,7 @@ import os
 import re
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pymysql
@@ -169,8 +169,14 @@ def file_mtime(path: Path) -> int:
     return int(path.stat().st_mtime)
 
 
+def _json_default(obj):
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def hash_payload(*parts) -> str:
-    payload = json.dumps(parts, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(parts, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=_json_default)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
