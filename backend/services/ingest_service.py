@@ -50,6 +50,16 @@ def _try_float(val: str | None) -> float | None:
         return None
 
 
+def _parse_creation_date(val: str | None, fallback: datetime) -> datetime:
+    # Fall back instead of raising: one malformed item must not fail the whole batch.
+    if not val:
+        return fallback
+    try:
+        return normalize_ingest_datetime(datetime.fromisoformat(val))
+    except (ValueError, TypeError, OverflowError):
+        return fallback
+
+
 def insert_workouts_from_ingest(cur, payload: IngestPayload, workout_items: list) -> int:
     if not workout_items:
         return 0
@@ -91,7 +101,7 @@ def insert_workouts_from_ingest(cur, payload: IngestPayload, workout_items: list
                 item.metadata.get("source_name") or payload.device_id,
                 item.metadata.get("source_version"),
                 json.dumps(device_payload, ensure_ascii=False, sort_keys=True) if device_payload else None,
-                start_at,
+                _parse_creation_date(item.metadata.get("creation_date"), start_at),
                 start_at,
                 end_at,
                 start_at.date(),
