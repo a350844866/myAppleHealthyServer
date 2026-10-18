@@ -84,6 +84,7 @@ body {
   opacity: 0.4;
   pointer-events: none;
   z-index: 0;
+  will-change: transform;
 }
 
 .ambient-a {
@@ -1082,7 +1083,7 @@ body[data-theme="dark"].is-loading [data-skeleton]::after {
 @media (max-width: 768px) {
   .app-shell {
     width: min(100vw - 20px, 100%);
-    padding-top: 20px;
+    padding: 20px 0 160px;
   }
 
   .topbar {
@@ -1114,6 +1115,18 @@ body[data-theme="dark"].is-loading [data-skeleton]::after {
   .chart-shell,
   .chart-shell.compact {
     height: 260px;
+  }
+
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table th,
+  .data-table td {
+    white-space: nowrap;
+    padding: 12px 8px;
   }
 
   .mobile-nav {
@@ -1160,8 +1173,11 @@ body[data-theme="dark"].is-loading [data-skeleton]::after {
     font-size: 34px;
   }
 
-  .metric-value,
+  .metric-value {
+    font-size: 28px;
+  }
+
   .signal-value {
-    font-size: 30px;
+    font-size: 24px;
   }
 }

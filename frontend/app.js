@@ -1,4 +1,9 @@
 const fmtInt = new Intl.NumberFormat("zh-CN");
+
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 const BASE = window.location.origin;
 const dashboardState = {
   home: null,
@@ -15,7 +20,11 @@ const dashboardState = {
 const chartRegistry = {};
 let routeMap = null;
 let routeLayerGroup = null;
+let routeTileLayer = null;
 let routeRequestSeq = 0;
+
+const TILE_LIGHT = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const TILE_DARK = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
 const MODEL_LABELS = {
   "minimax/minimax-m2.7": "MiniMax M2.7",
@@ -584,7 +593,7 @@ function renderWorkoutWeeklyPanel(payload) {
     </div>
     <div class="summary-card">
       <div class="summary-label">最常见训练</div>
-      <div class="summary-value">${topTypes && topTypes[0] ? shortActivity(topTypes[0].activity_type) : "-"}</div>
+      <div class="summary-value">${topTypes && topTypes[0] ? escapeHtml(shortActivity(topTypes[0].activity_type)) : "-"}</div>
       <div class="summary-note">${topTypes && topTypes[0] ? `${topTypes[0].count} 次` : "暂无"}</div>
     </div>
   `;
@@ -616,17 +625,34 @@ function renderWorkoutWeeklyPanel(payload) {
   });
 }
 
+function currentTileUrl() {
+  return document.body.dataset.theme === "dark" ? TILE_DARK : TILE_LIGHT;
+}
+
 function ensureRouteMap() {
   if (typeof L === "undefined") return null;
   if (!routeMap) {
     routeMap = L.map("routeMap", { zoomControl: true });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap",
+    routeTileLayer = L.tileLayer(currentTileUrl(), {
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       maxZoom: 19,
     }).addTo(routeMap);
     routeLayerGroup = L.layerGroup().addTo(routeMap);
   }
   return routeMap;
+}
+
+function updateRouteMapTheme() {
+  if (routeTileLayer) {
+    routeTileLayer.setUrl(currentTileUrl());
+  }
+  if (routeMap && routeLayerGroup) {
+    routeLayerGroup.eachLayer(layer => {
+      if (layer.setStyle && !(layer instanceof L.CircleMarker)) {
+        layer.setStyle({ color: cssVar("--accent") });
+      }
+    });
+  }
 }
 
 function syncRouteModeButtons() {
@@ -640,12 +666,12 @@ function renderRouteCards(detail) {
   cards.innerHTML = `
     <div class="summary-card">
       <div class="summary-label">路线类型</div>
-      <div class="summary-value">${shortActivity(detail.activity_type)}</div>
-      <div class="summary-note">${shortDate(detail.date || detail.start_at)} · ${humanMinutes(detail.duration)}</div>
+      <div class="summary-value">${escapeHtml(shortActivity(detail.activity_type))}</div>
+      <div class="summary-note">${shortDate(detail.date || detail.start_at)} · ${escapeHtml(humanMinutes(detail.duration))}</div>
     </div>
     <div class="summary-card">
       <div class="summary-label">距离 / 点数</div>
-      <div class="summary-value">${formatDistance(detail.total_distance, detail.total_distance_unit)}</div>
+      <div class="summary-value">${escapeHtml(formatDistance(detail.total_distance, detail.total_distance_unit))}</div>
       <div class="summary-note">${fmtInt.format(detail.point_count || 0)} 个 GPS 点</div>
     </div>
     <div class="summary-card">
@@ -687,9 +713,9 @@ function renderRouteList() {
   }
   root.innerHTML = routes.map(item => `
     <article class="route-item ${item.id === dashboardState.activeRouteId ? "active" : ""}" data-route-id="${item.id}">
-      <div class="route-item-title">${shortActivity(item.activity_type)}</div>
-      <div class="route-item-sub">${shortDate(item.date || item.start_at)} · ${humanMinutes(item.duration)}</div>
-      <div class="route-item-meta">${formatDistance(item.total_distance, item.total_distance_unit)} · ${fmtInt.format(item.point_count || 0)} 点</div>
+      <div class="route-item-title">${escapeHtml(shortActivity(item.activity_type))}</div>
+      <div class="route-item-sub">${shortDate(item.date || item.start_at)} · ${escapeHtml(humanMinutes(item.duration))}</div>
+      <div class="route-item-meta">${escapeHtml(formatDistance(item.total_distance, item.total_distance_unit))} · ${fmtInt.format(item.point_count || 0)} 点</div>
     </article>
   `).join("");
   root.querySelectorAll(".route-item").forEach(node => {
@@ -821,7 +847,7 @@ function renderRouteOverview(routes) {
     return;
   }
   select.innerHTML = dashboardState.routeSummaries.map(item => `
-    <option value="${item.id}">${shortDate(item.date || item.start_at)} · ${shortActivity(item.activity_type)} · ${formatDistance(item.total_distance, item.total_distance_unit)}</option>
+    <option value="${item.id}">${shortDate(item.date || item.start_at)} · ${escapeHtml(shortActivity(item.activity_type))} · ${escapeHtml(formatDistance(item.total_distance, item.total_distance_unit))}</option>
   `).join("");
   const activeId = dashboardState.activeRouteId && dashboardState.routeSummaries.find(item => item.id === dashboardState.activeRouteId)
     ? dashboardState.activeRouteId
@@ -918,12 +944,12 @@ function renderHero(home) {
       <div class="signal-head">
         <div>
           <div class="signal-mark"></div>
-          <div class="signal-label">${item.label}</div>
+          <div class="signal-label">${escapeHtml(item.label)}</div>
         </div>
         <div class="signal-status">${item.level === "good" ? "绿灯" : item.level === "warn" ? "黄灯" : item.level === "bad" ? "红灯" : "待补数据"}</div>
       </div>
-      <div class="signal-value">${item.value}</div>
-      <div class="signal-note">${item.note}</div>
+      <div class="signal-value">${escapeHtml(item.value)}</div>
+      <div class="signal-note">${escapeHtml(item.note)}</div>
     </article>
   `).join("");
 
@@ -964,9 +990,9 @@ function renderHero(home) {
 
   document.getElementById("focusList").innerHTML = focusItems.map(item => `
     <article class="focus-chip">
-      <div class="focus-title">${item.title}</div>
-      <div class="focus-value">${item.value}</div>
-      <div class="focus-sub">${item.sub}</div>
+      <div class="focus-title">${escapeHtml(item.title)}</div>
+      <div class="focus-value">${escapeHtml(item.value)}</div>
+      <div class="focus-sub">${escapeHtml(item.sub)}</div>
     </article>
   `).join("");
 }
@@ -1021,10 +1047,10 @@ function renderInsights(home) {
     return;
   }
   root.innerHTML = rows.map(item => `
-    <article class="insight-item ${item.level || "notice"} ${item.raw_type ? "clickable" : ""}" data-type="${item.raw_type || ""}">
-      <div class="insight-level">${item.level || "notice"}</div>
-      <div class="insight-title">${item.title || "-"}</div>
-      <div class="insight-detail">${item.detail || "-"}</div>
+    <article class="insight-item ${escapeHtml(item.level || "notice")} ${item.raw_type ? "clickable" : ""}" data-type="${escapeHtml(item.raw_type || "")}">
+      <div class="insight-level">${escapeHtml(item.level || "notice")}</div>
+      <div class="insight-title">${escapeHtml(item.title || "-")}</div>
+      <div class="insight-detail">${escapeHtml(item.detail || "-")}</div>
     </article>
   `).join("");
   root.querySelectorAll(".insight-item.clickable").forEach(node => {
@@ -1046,8 +1072,8 @@ function renderWorkouts(home) {
   document.getElementById("workoutHighlight").innerHTML = `
     <div class="summary-card">
       <div class="summary-label">最近一次训练</div>
-      <div class="summary-value">${last ? shortActivity(last.activity_type) : "-"}</div>
-      <div class="summary-note">${last ? `${shortDate(last.date || last.start_at)} · ${humanMinutes(last.duration)}` : "最近 30 天暂无训练"}</div>
+      <div class="summary-value">${last ? escapeHtml(shortActivity(last.activity_type)) : "-"}</div>
+      <div class="summary-note">${last ? `${shortDate(last.date || last.start_at)} · ${escapeHtml(humanMinutes(last.duration))}` : "最近 30 天暂无训练"}</div>
     </div>
     <div class="summary-card">
       <div class="summary-label">近 7 天训练</div>
@@ -1062,9 +1088,9 @@ function renderWorkouts(home) {
   `;
 
   renderRows("recentWorkoutTable", home.workouts.recent || [], r => `
-    <td>${r.date || shortDate(r.start_at)}</td>
-    <td>${shortActivity(r.activity_type)}</td>
-    <td>${humanMinutes(r.duration)}</td>
+    <td>${escapeHtml(r.date || shortDate(r.start_at))}</td>
+    <td>${escapeHtml(shortActivity(r.activity_type))}</td>
+    <td>${escapeHtml(humanMinutes(r.duration))}</td>
     <td>${r.total_energy_burned ? fmtInt.format(Math.round(r.total_energy_burned)) : "-"}</td>
   `, 4);
 }
@@ -1077,8 +1103,8 @@ function renderRecentTypes(home) {
     return;
   }
   el.innerHTML = rows.map(r => `
-    <tr class="table-clickable" data-raw-type="${r.type}">
-      <td title="${r.type}">${shortType(r.type)}</td>
+    <tr class="table-clickable" data-raw-type="${escapeHtml(r.type)}">
+      <td title="${escapeHtml(r.type)}">${escapeHtml(shortType(r.type))}</td>
       <td>${fmtInt.format(r.count_7d || 0)}</td>
       <td>${shortDateTime(r.last_at)}</td>
     </tr>
@@ -1099,7 +1125,7 @@ function renderStatus(home) {
   const deviceLabel = primaryDevice ? displayDeviceName(primaryDevice.device_id) : "主设备";
   const syncLabel = primaryDevice ? humanSyncStatus(primaryDevice.last_sync_status) : "等待同步";
   const levelClass = statusDotClass(primaryDevice && primaryDevice.last_sync_status, home.sync.hours_since_last_sync);
-  document.getElementById("backendStatus").innerHTML = `<span class="status-dot ${levelClass}"></span><span>${deviceLabel} · ${syncLabel}</span>`;
+  document.getElementById("backendStatus").innerHTML = `<span class="status-dot ${levelClass}"></span><span>${escapeHtml(deviceLabel)} · ${escapeHtml(syncLabel)}</span>`;
 }
 
 function renderDevices(home) {
@@ -1117,10 +1143,10 @@ function renderDevices(home) {
       <div class="device-hero-head">
         <div>
           <div class="summary-label">当前主设备</div>
-          <div class="device-name">${displayDeviceName(primary.device_id)}</div>
-          <div class="device-note">${humanSyncStatus(primary.last_sync_status)} · 最近同步 ${shortDateTime(primary.last_sync_at)}</div>
+          <div class="device-name">${escapeHtml(displayDeviceName(primary.device_id))}</div>
+          <div class="device-note">${escapeHtml(humanSyncStatus(primary.last_sync_status))} · 最近同步 ${shortDateTime(primary.last_sync_at)}</div>
         </div>
-        <span class="tag ${primary.last_sync_status === "failed" ? "tag-gold" : "tag-blue"}">${humanSyncStatus(primary.last_sync_status)}</span>
+        <span class="tag ${primary.last_sync_status === "failed" ? "tag-gold" : "tag-blue"}">${escapeHtml(humanSyncStatus(primary.last_sync_status))}</span>
       </div>
       <div class="device-meta-grid">
         <div class="summary-card">
@@ -1143,8 +1169,8 @@ function renderDevices(home) {
     ${extras.map(item => `
       <div class="device-mini">
         <div class="summary-label">历史设备</div>
-        <div class="summary-value">${displayDeviceName(item.device_id)}</div>
-        <div class="summary-note">${humanSyncStatus(item.last_sync_status)} · ${shortDateTime(item.last_sync_at)}</div>
+        <div class="summary-value">${escapeHtml(displayDeviceName(item.device_id))}</div>
+        <div class="summary-note">${escapeHtml(humanSyncStatus(item.last_sync_status))} · ${shortDateTime(item.last_sync_at)}</div>
       </div>
     `).join("")}
   `;
@@ -1159,7 +1185,7 @@ function renderSyncEvents(syncState) {
   }
   el.innerHTML = rows.slice(0, 6).map(row => `
     <tr>
-      <td>${displayDeviceName(row.device_id)}<div class="panel-subtitle">${humanSyncStatus(row.status)}</div></td>
+      <td>${escapeHtml(displayDeviceName(row.device_id))}<div class="panel-subtitle">${escapeHtml(humanSyncStatus(row.status))}</div></td>
       <td>${shortDateTime(row.received_at || row.sent_at)}</td>
       <td>${fmtInt.format(row.accepted_count || 0)} 条</td>
     </tr>
@@ -1173,7 +1199,7 @@ function renderAIControls(home) {
   const meta = document.getElementById("aiMeta");
   const ai = home.ai || {};
   const models = ai.models || [];
-  select.innerHTML = models.map(model => `<option value="${model}" ${model === ai.default_model ? "selected" : ""}>${MODEL_LABELS[model] || model}</option>`).join("");
+  select.innerHTML = models.map(model => `<option value="${escapeHtml(model)}" ${model === ai.default_model ? "selected" : ""}>${escapeHtml(MODEL_LABELS[model] || model)}</option>`).join("");
 
   const enabled = Boolean(ai.available && models.length);
   select.disabled = !enabled;
@@ -1194,23 +1220,23 @@ function renderAIAnalysis(result) {
   const watchouts = Array.isArray(analysis.watchouts) ? analysis.watchouts : [];
   const nextFocus = Array.isArray(analysis.next_focus) ? analysis.next_focus : [];
   panel.innerHTML = `
-    <div class="ai-title">${analysis.title || "智能总结"}</div>
-    <div class="ai-summary">${analysis.summary || "-"}</div>
+    <div class="ai-title">${escapeHtml(analysis.title || "智能总结")}</div>
+    <div class="ai-summary">${escapeHtml(analysis.summary || "-")}</div>
     <div class="ai-section">
       <div class="label">重点</div>
-      <ul>${bullets.map(item => `<li>${item}</li>`).join("") || "<li>暂无</li>"}</ul>
+      <ul>${bullets.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>暂无</li>"}</ul>
     </div>
     <div class="ai-section">
       <div class="label">注意</div>
-      <ul>${watchouts.map(item => `<li>${item}</li>`).join("") || "<li>暂无明显风险提示</li>"}</ul>
+      <ul>${watchouts.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>暂无明显风险提示</li>"}</ul>
     </div>
     <div class="ai-section">
       <div class="label">下一步关注</div>
-      <ul>${nextFocus.map(item => `<li>${item}</li>`).join("") || "<li>继续观察近期数据变化</li>"}</ul>
+      <ul>${nextFocus.map(item => `<li>${escapeHtml(item)}</li>`).join("") || "<li>继续观察近期数据变化</li>"}</ul>
     </div>
     <div class="ai-section">
       <div class="label">置信度</div>
-      <div>${analysis.confidence || "-"}</div>
+      <div>${escapeHtml(analysis.confidence || "-")}</div>
     </div>
   `;
   const suffix = result.degraded ? " · 已降级到最近一次可用总结" : "";
@@ -1226,11 +1252,11 @@ function renderAIReportHistory(reports) {
   root.innerHTML = reports.map((report, idx) => `
     <article class="history-item" data-report-idx="${idx}">
       <div class="history-top">
-        <div class="history-title">${report.analysis && report.analysis.title ? report.analysis.title : "AI 总结"}</div>
-        <span class="tag tag-blue">${MODEL_LABELS[report.model] || report.model}</span>
+        <div class="history-title">${escapeHtml(report.analysis && report.analysis.title ? report.analysis.title : "AI 总结")}</div>
+        <span class="tag tag-blue">${escapeHtml(MODEL_LABELS[report.model] || report.model)}</span>
       </div>
       <div class="history-meta">${shortDateTime(report.generated_at)}</div>
-      <div class="history-summary">${report.analysis && report.analysis.summary ? report.analysis.summary : "-"}</div>
+      <div class="history-summary">${escapeHtml(report.analysis && report.analysis.summary ? report.analysis.summary : "-")}</div>
     </article>
   `).join("");
   root.querySelectorAll(".history-item").forEach(node => {
@@ -1247,7 +1273,7 @@ async function loadAIReportHistory() {
     dashboardState.aiReports = Array.isArray(reports) ? reports : [];
     renderAIReportHistory(dashboardState.aiReports);
   } catch (err) {
-    document.getElementById("aiHistory").innerHTML = `<div class="empty-state">最近总结加载失败: ${err.message}</div>`;
+    document.getElementById("aiHistory").innerHTML = `<div class="empty-state">最近总结加载失败: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -1266,7 +1292,7 @@ async function generateAIAnalysis(forceRefresh = false) {
     renderAIAnalysis(result);
     await loadAIReportHistory();
   } catch (err) {
-    document.getElementById("aiPanel").innerHTML = `<div class="empty-state">AI 分析失败: ${err.message}</div>`;
+    document.getElementById("aiPanel").innerHTML = `<div class="empty-state">AI 分析失败: ${escapeHtml(err.message)}</div>`;
     document.getElementById("aiMeta").textContent = "AI 请求失败。";
   }
 }
@@ -1341,9 +1367,9 @@ async function loadModalData(rawType, days, requestSeq = nextModalRequestSeq()) 
   if (vals.length) {
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
     document.getElementById("modalStats").innerHTML = `
-      <div class="modal-stat"><div class="label">${aggLabel}均值</div><div class="val">${fmtNum(avg)} <small>${unit}</small></div></div>
-      <div class="modal-stat"><div class="label">${aggLabel}最低</div><div class="val">${fmtNum(Math.min(...vals))} <small>${unit}</small></div></div>
-      <div class="modal-stat"><div class="label">${aggLabel}最高</div><div class="val">${fmtNum(Math.max(...vals))} <small>${unit}</small></div></div>
+      <div class="modal-stat"><div class="label">${aggLabel}均值</div><div class="val">${fmtNum(avg)} <small>${escapeHtml(unit)}</small></div></div>
+      <div class="modal-stat"><div class="label">${aggLabel}最低</div><div class="val">${fmtNum(Math.min(...vals))} <small>${escapeHtml(unit)}</small></div></div>
+      <div class="modal-stat"><div class="label">${aggLabel}最高</div><div class="val">${fmtNum(Math.max(...vals))} <small>${escapeHtml(unit)}</small></div></div>
       <div class="modal-stat"><div class="label">覆盖天数</div><div class="val">${data.length}</div></div>
       <div class="modal-stat"><div class="label">原始记录数</div><div class="val">${fmtInt.format(totalCount)}</div></div>
     `;
@@ -1431,9 +1457,9 @@ async function loadMetricHourly(metric, date, requestSeq = nextModalRequestSeq()
       const max = Math.max(...nonZero);
       const peakHour = slots.indexOf(max);
       document.getElementById("modalStats").innerHTML = `
-        ${total != null ? `<div class="modal-stat"><div class="label">全天合计</div><div class="val">${fmtNum(total)} <small>${unit}</small></div></div>` : ""}
-        <div class="modal-stat"><div class="label">${cfg.agg === "sum" ? "小时均值" : "全天均值"}</div><div class="val">${fmtNum(avg)} <small>${unit}</small></div></div>
-        <div class="modal-stat"><div class="label">峰值</div><div class="val">${fmtNum(max)} <small>${unit}</small></div></div>
+        ${total != null ? `<div class="modal-stat"><div class="label">全天合计</div><div class="val">${fmtNum(total)} <small>${escapeHtml(unit)}</small></div></div>` : ""}
+        <div class="modal-stat"><div class="label">${cfg.agg === "sum" ? "小时均值" : "全天均值"}</div><div class="val">${fmtNum(avg)} <small>${escapeHtml(unit)}</small></div></div>
+        <div class="modal-stat"><div class="label">峰值</div><div class="val">${fmtNum(max)} <small>${escapeHtml(unit)}</small></div></div>
         <div class="modal-stat"><div class="label">峰值时段</div><div class="val">${peakHour}:00</div></div>
         <div class="modal-stat"><div class="label">记录条数</div><div class="val">${fmtInt.format(totalCount)}</div></div>
       `;
@@ -1446,7 +1472,7 @@ async function loadMetricHourly(metric, date, requestSeq = nextModalRequestSeq()
       { color: cfg.color.includes("var(") ? cssVar(cfg.color.slice(4, -1)) : cfg.color, label: cfg.title, tooltipSuffix: unit ? ` ${unit}` : "" },
     );
   } catch (err) {
-    document.getElementById("modalStats").innerHTML = `<div class="modal-stat"><div class="label">加载失败: ${err.message}</div></div>`;
+    document.getElementById("modalStats").innerHTML = `<div class="modal-stat"><div class="label">加载失败: ${escapeHtml(err.message)}</div></div>`;
   }
 }
 
@@ -1471,8 +1497,8 @@ function openSyncDetail() {
     <div class="modal-stat"><div class="label">数据新鲜度</div><div class="val">${humanFreshness(home.sync.hours_since_last_sync)}</div></div>
     <div class="modal-stat"><div class="label">今日同步次数</div><div class="val">${home.sync.today_sync_count || 0}</div></div>
     <div class="modal-stat"><div class="label">今日接受记录</div><div class="val">${fmtInt.format(home.sync.today_sync_accepted || 0)} 条</div></div>
-    <div class="modal-stat"><div class="label">主设备</div><div class="val">${primary ? displayDeviceName(primary.device_id) : "-"}</div></div>
-    <div class="modal-stat"><div class="label">最近设备状态</div><div class="val">${primary ? humanSyncStatus(primary.last_sync_status) : "-"}</div></div>
+    <div class="modal-stat"><div class="label">主设备</div><div class="val">${primary ? escapeHtml(displayDeviceName(primary.device_id)) : "-"}</div></div>
+    <div class="modal-stat"><div class="label">最近设备状态</div><div class="val">${primary ? escapeHtml(humanSyncStatus(primary.last_sync_status)) : "-"}</div></div>
   `;
   clearModalChart();
   modal.classList.add("open");
@@ -1521,7 +1547,7 @@ async function loadDashboard() {
     renderAIReportHistory(dashboardState.aiReports);
     if (dashboardState.aiReports.length) renderAIAnalysis(dashboardState.aiReports[0]);
   } catch (err) {
-    document.getElementById("backendStatus").innerHTML = `<span class="status-dot bad"></span><span>${err.message}</span>`;
+    document.getElementById("backendStatus").innerHTML = `<span class="status-dot bad"></span><span>${escapeHtml(err.message)}</span>`;
   } finally {
     loading = false;
     setLoadingState(false);
@@ -1537,6 +1563,7 @@ function applyTheme(theme) {
     renderSleepPanel(dashboardState.home);
     renderHeartRatePanel(dashboardState.home);
   }
+  updateRouteMapTheme();
 }
 
 function initTheme() {
@@ -1613,8 +1640,6 @@ window.addEventListener("resize", () => {
     if (dashboardState.sleepQuality) renderSleepQualityPanel(dashboardState.sleepQuality);
     if (dashboardState.workoutWeekly) renderWorkoutWeeklyPanel(dashboardState.workoutWeekly);
     if (routeMap) routeMap.invalidateSize();
-    if (modalMode === "hourly" && currentHourlyMetric) loadMetricHourly(currentHourlyMetric, currentHourlyDate, nextModalRequestSeq());
-    else if (currentModalType) loadModalData(currentModalType, modalDays, nextModalRequestSeq());
   }, 180);
 });
 
